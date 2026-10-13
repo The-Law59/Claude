@@ -1,4 +1,4 @@
-# Keep Pushing — version 0.1
+# Keep Pushing — version 0.2
 
 **La F1 à votre rythme.** Application React Native / Expo, iPhone et Android, thème Blanc & paprika.
 
@@ -20,23 +20,21 @@ Si la version d’Expo Go ne prend plus en charge SDK 57, mettre à niveau le SD
 
 ## Fonctionnalités
 
-- Accueil personnalisé par pilotes et écuries, fil de toutes les actualités.
-- Article détaillé, filtre de rumeurs.
-- Classement de course simulé, résultats par session, points pilotes et écuries fictifs.
-- Horaires du week-end convertis dans le fuseau du téléphone.
-- Favoris et réglages persistés avec AsyncStorage, sans compte.
-- Protection par session ou week-end : articles liés et résultats masqués. Les points du championnat sont masqués dès qu’une session est protégée.
-- Rappels locaux neutres à 10, 30 ou 60 minutes, avec autorisation du téléphone demandée à l’activation.
-
-**Toutes les données sont fictives**, y compris les horaires du 16 au 18 octobre 2026. Les rappels sont désactivés par défaut : ne les activer que pour tester ces dates de démonstration. Aucune actualité distante ni notification de résultat n’est envoyée. Le choix de fréquence des actualités et les alertes de résultats sont enregistrés pour l’intégration future.
+- Calendrier, résultats de la dernière course et des qualifications, classements pilotes et écuries réels via l’API publique [Jolpica](https://github.com/jolpica/jolpica-f1) (sans clé). Sans réseau, l’app bascule sur les données de démonstration, signalées en haut de l’écran.
+- Accueil : prochain Grand Prix et prochaine session, fil d’actualités filtré par favoris. Les actualités restent fictives tant qu’aucune source n’est branchée.
+- Anti-spoil par session ou par week-end, pour le dernier et le prochain Grand Prix. Articles liés et résultats masqués ; classements masqués dès qu’une session est protégée.
+- Favoris (liste des pilotes et écuries de la saison) et réglages enregistrés sur l’appareil, sans compte.
+- Rappels locaux neutres à 10, 30 ou 60 minutes pour les sessions du prochain Grand Prix.
 
 ## Architecture
 
-- `App.tsx` : cinq écrans et navigation, thème, lecture et sauvegarde des préférences.
-- `src/model.mjs` : règles de visibilité, anti-spoil, notification et planification, testables sans téléphone.
-- `src/data.mjs` : jeux de démonstration et contrat minimal de fournisseur.
-- `src/reminders.ts` : rappels locaux natifs. Aucune notification à contenu sportif n’est programmée dans cette version.
-- `tests/model.test.mjs` : tests de règles métier.
+- `app/` : écrans (expo-router). `(tabs)/` contient Accueil, Course, Saison, Favoris, Réglages ; `article/[id].tsx` le détail d’un article. Le bouton retour Android et les liens `keeppushing://` fonctionnent.
+- `src/store.tsx` : préférences et saison partagées entre les écrans.
+- `src/ui.tsx` : thème, composants communs (en-tête, boutons, interrupteurs, classements).
+- `src/model.mjs` : règles anti-spoil, rappels, choix du week-end en cours. Testables sans téléphone.
+- `src/jolpica.mjs` : lecture de l’API Jolpica vers le modèle de l’app.
+- `src/data.mjs` : données de démonstration, même forme que la saison réelle.
+- Modèle : compétition → week-end → sessions. Les ids de session incluent le week-end (`f1-2026-19:Race`) : protéger une course ne masque pas les autres Grands Prix, et l’ajout d’autres compétitions se fera par un nouveau fournisseur.
 
 ## Vérifier
 
@@ -44,7 +42,7 @@ Si la version d’Expo Go ne prend plus en charge SDK 57, mettre à niveau le SD
 
 ## Étape suivante
 
-Brancher un service d’actualités autorisé (résumés français et sources), calendrier et résultats fiables. Chaque article doit référencer toutes les sessions qu’il peut révéler ; en cas de doute, le masquer quand l’anti-spoil est actif. Les notifications distantes devront appliquer la protection côté serveur avant envoi, notamment quand l’application est fermée. Ne pas ajouter de notification révélant un résultat avant cette intégration.
+Brancher un service d’actualités autorisé (résumés français et sources). Chaque article doit référencer toutes les sessions qu’il peut révéler ; en cas de doute, le masquer quand l’anti-spoil est actif. Les notifications distantes devront appliquer la protection côté serveur avant envoi. Ajouter un cache hors ligne de la dernière saison chargée.
 
 Le direct et la position des voitures sur le circuit nécessitent une source dont les droits de redistribution et le coût ont été validés. Ne jamais inclure de clé privée de fournisseur dans l’application mobile. Les comptes et la synchronisation viendront ensuite.
 

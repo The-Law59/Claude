@@ -2,7 +2,7 @@
   "expo": {
     "name": "Keep Pushing",
     "slug": "keep-pushing",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
@@ -12,6 +12,11 @@
     "android": {
       "package": "com.keeppushing.mobile"
     },
-    "plugins": ["expo-notifications", "expo-status-bar"]
+    "plugins": [
+      "expo-notifications",
+      "expo-status-bar",
+      "expo-router"
+    ],
+    "scheme": "keeppushing"
   }
 }

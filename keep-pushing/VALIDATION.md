@@ -1,10 +1,8 @@
-# Validation — V1 du 13 octobre 2026
+# Validation — V0.2 du 13 octobre 2026
 
-- 7 tests métier réussis : filtrage, rumeurs, importance, protection des sessions, rappels neutres et reprise des préférences.
+- 12 tests réussis (`npm test`) : règles anti-spoil, ids de session par week-end, choix du week-end en cours, lecture du format Jolpica, erreurs réseau.
 - Vérification TypeScript : réussie.
-- Versions des dépendances : compatibles avec les recommandations locales du SDK Expo 57 (contrôle hors ligne).
-- Export JavaScript/Hermes iOS et Android : réussi.
-- Export web : réussi.
-- Interface web exécutée dans un DOM de test : navigation, protection de toutes les sessions, déblocage de la seule course, article de qualifications masqué et écriture des préférences vérifiés.
+- Export web : réussi. Parcours vérifié dans Chromium au format iPhone : navigation entre onglets, article puis retour, protection du week-end, déblocage de la seule course, préférences conservées après rechargement.
+- API Jolpica : non joignable depuis l’environnement de test ; seul le mode démonstration a été vu à l’écran. Le format est couvert par les tests.
 
-Ces contrôles ne constituent pas une compilation IPA/APK, ni un essai sur appareil iPhone/Android. Les rappels, leurs autorisations et le rendu visuel final restent à vérifier sur téléphone. Le navigateur de rendu n’a pas pu être téléchargé dans cet environnement ; aucun test visuel automatisé n’est revendiqué.
+Pas encore vérifié : compilation IPA/APK, essai sur téléphone, rappels et autorisations.

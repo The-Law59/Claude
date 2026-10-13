@@ -1,8 +1,10 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { reminderPlan } from "./model.mjs";
-import { sessions } from "./data.mjs";
-export async function syncReminders(prefs: any) {
+export async function syncReminders(
+  prefs: any,
+  event: { name: string; sessions: { id: string; label: string; startsAt: string }[] },
+) {
   if (Platform.OS === "web") return "Les rappels nécessitent un téléphone.";
   if (Platform.OS === "android")
     await Notifications.setNotificationChannelAsync("sessions", {
@@ -20,7 +22,7 @@ export async function syncReminders(prefs: any) {
   }
   // Toutes les notifications de cette V1 sont des rappels neutres, jamais des résultats.
   await Notifications.cancelAllScheduledNotificationsAsync();
-  const plan = reminderPlan(sessions, prefs);
+  const plan = reminderPlan(event.sessions, prefs, Date.now(), event.name);
   for (const r of plan)
     await Notifications.scheduleNotificationAsync({
       identifier: `kp-${r.id}`,
@@ -32,6 +34,6 @@ export async function syncReminders(prefs: any) {
       },
     });
   return plan.length
-    ? `${plan.length} rappels de démonstration programmés.`
+    ? `${plan.length} rappels programmés.`
     : "Aucun rappel à venir.";
 }

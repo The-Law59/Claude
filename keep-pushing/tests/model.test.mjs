@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { articles, sessions } from "../src/data.mjs";
+import { articles, sessions, demoSeason } from "../src/data.mjs";
+const RACE = sessions.at(-1).id,
+  QUALI = sessions.at(-2).id;
 import {
   defaults,
   restorePreferences,
@@ -9,9 +11,10 @@ import {
   setProtected,
   protectWeekend,
   reminderPlan,
+  focusEvents,
 } from "../src/model.mjs";
 test("Une session protégée masque son article même dans toute la F1", () => {
-  const p = setProtected(defaults(), "race", true);
+  const p = setProtected(defaults(), RACE, true);
   const a = articles.find((x) => x.id === "race-battle");
   assert.equal(articleVisible(a, p, false), false);
   assert.equal(notificationAllowed({ ...a, kind: "news" }, p), false);
@@ -20,11 +23,11 @@ test("Une session protégée masque son article même dans toute la F1", () => {
 test("Débloquer les qualifications ne débloque pas la course", () => {
   const p = setProtected(
     protectWeekend(defaults(), sessions, true),
-    "qualifying",
+    QUALI,
     false,
   );
-  assert(!p.protectedSessions.includes("qualifying"));
-  assert(p.protectedSessions.includes("race"));
+  assert(!p.protectedSessions.includes(QUALI));
+  assert(p.protectedSessions.includes(RACE));
   assert(
     articleVisible(
       articles.find((x) => x.id === "pole"),
@@ -36,8 +39,8 @@ test("Débloquer les qualifications ne débloque pas la course", () => {
 test("Un article lié à plusieurs sessions reste protégé tant qu’une session l’est", () => {
   assert.equal(
     articleVisible(
-      { ...articles[0], sessionIds: ["race", "qualifying"] },
-      setProtected(defaults(), "race", true),
+      { ...articles[0], sessionIds: [RACE, QUALI] },
+      setProtected(defaults(), RACE, true),
       false,
     ),
     false,
@@ -45,7 +48,7 @@ test("Un article lié à plusieurs sessions reste protégé tant qu’une sessio
 });
 test("Les rappels neutres restent autorisés en anti-spoil", () => {
   const p = { ...protectWeekend(defaults(), sessions, true), reminders: true };
-  assert(notificationAllowed({ kind: "reminder", sessionIds: ["race"] }, p));
+  assert(notificationAllowed({ kind: "reminder", sessionIds: [RACE] }, p));
   assert.equal(reminderPlan(sessions, p, 0).length, 5);
   assert.equal(reminderPlan(sessions, p, Date.parse("2027-01-01")).length, 0);
 });
@@ -82,10 +85,10 @@ test("Préférences corrompues ou ancien format : reprise sûre", () => {
   assert.deepEqual(restorePreferences("{oops", sessions), defaults());
   assert.deepEqual(restorePreferences('{"version":99}', sessions), defaults());
   const p = restorePreferences(
-    '{"version":1,"protectedSessions":["race","unknown"],"reminderMinutes":-10}',
+    JSON.stringify({ version: 2, protectedSessions: [RACE, "race"], reminderMinutes: -10 }),
     sessions,
   );
-  assert.deepEqual(p.protectedSessions, ["race"]);
+  assert.deepEqual(p.protectedSessions, [RACE]);
   assert.equal(p.reminderMinutes, 30);
 });
 test("Le plan de rappel applique le délai exact et désactivation", () => {
@@ -95,4 +98,24 @@ test("Le plan de rappel applique le délai exact et désactivation", () => {
     Date.parse(sessions[0].startsAt) - 600000,
   );
   assert.deepEqual(reminderPlan(sessions, defaults(), 0), []);
+});
+test("Les ids de session sont propres à chaque week-end", () => {
+  const p = setProtected(defaults(), RACE, true);
+  assert(!p.protectedSessions.includes("f1-demo-2:Race"));
+  const other = [{ id: "f1-demo-2:Race" }];
+  assert(protectWeekend(protectWeekend(p, other, true), other, false).protectedSessions.includes(RACE));
+  assert.equal(new Set(sessions.map((x) => x.id)).size, sessions.length);
+});
+test("Week-end en cours et dernier week-end selon la date", () => {
+  const e = (id, race) => ({ id, sessions: [{ startsAt: race }] });
+  const events = [e("a", "2026-10-04T12:00:00Z"), e("b", "2026-10-18T12:00:00Z")];
+  const mid = Date.parse("2026-10-10T00:00:00Z");
+  assert.deepEqual(
+    Object.values(focusEvents(events, mid)).map((x) => x.id),
+    ["b", "a"],
+  );
+  const during = Date.parse("2026-10-18T13:00:00Z");
+  assert.equal(focusEvents(events, during).current.id, "b");
+  assert.equal(focusEvents(events, Date.parse("2027-01-01")).current.id, "b");
+  assert.equal(focusEvents(demoSeason.events, 0).last.id, "f1-demo-1");
 });
