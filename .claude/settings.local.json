@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git add *)",
-      "Bash(git commit -q -m 'Install ponytail, graphify, agent-skills and omniroute for Claude Code *)",
-      "Bash(git push *)"
-    ]
-  }
-}
