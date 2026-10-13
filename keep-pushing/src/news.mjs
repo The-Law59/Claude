@@ -22,9 +22,10 @@ const clean = (s = "") =>
 export function parseRss(xml, source, now = Date.now()) {
   return [...xml.matchAll(/<item\b[\s\S]*?<\/item>/g)]
     .map(([item]) => {
-      const get = (tag) =>
-        clean(item.match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`))?.[1]);
-      const summary = get("description");
+      const raw = (tag) => item.match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`))?.[1];
+      const get = (tag) => clean(raw(tag));
+      // Retire le lien « Continuez de lire » que certains flux ajoutent au résumé.
+      const summary = clean(raw("description")?.replace(/<a\b[^>]*class=['"]more['"][\s\S]*?<\/a>/g, ""));
       return {
         title: get("title"),
         link: get("link"),

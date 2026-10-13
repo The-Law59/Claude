@@ -7,7 +7,7 @@ import { loadNews, parseRss, toArticle } from "../src/news.mjs";
 const xml = `<?xml version="1.0"?><rss><channel><title>Test</title>
 <item><title><![CDATA[Verstappen et Red Bull &amp; la «&#160;pole&#160;»]]></title>
 <link>https://example.com/a</link><pubDate>Sat, 17 Oct 2026 15:00:00 GMT</pubDate>
-<description><![CDATA[<p>Un <b>résumé</b> &#x2014; avec HTML.</p>]]></description></item>
+<description><![CDATA[<p>Un <b>résumé</b> &#x2014; avec HTML.</p><a class='more' href='https://example.com/a'>Continuez de lire</a>]]></description></item>
 <item><title>Sans date, rumeur sur Ferrari</title><link>https://example.com/b</link></item>
 <item><title>Lien non sécurisé</title><link>http://example.com/c</link></item>
 </channel></rss>`;

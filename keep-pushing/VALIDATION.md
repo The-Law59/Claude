@@ -5,6 +5,6 @@
 - Export web : réussi. Parcours vérifié dans Chromium au format iPhone : navigation entre onglets, article puis retour, protection du week-end, déblocage de la seule course, préférences conservées après rechargement.
 - API Jolpica : données réelles chargées et affichées dans Chromium (23 Grands Prix 2026, dernière course, qualifications, classements pilotes et écuries). Mode démonstration vérifié aussi, sans réseau.
 
-- Flux Motorsport.com : non joignable depuis l’environnement de test, pas encore vu à l’écran.
+- Flux Motorsport.com : 40 articles réels affichés ; 16 dans « Pour vous » avec les favoris par défaut ; week-end de Singapour protégé, seuls les 5 articles antérieurs restent visibles. Aperçu web lancé sans contrôle CORS (le flux n’envoie pas d’en-tête CORS ; l’app mobile n’est pas concernée).
 
 Pas encore vérifié : compilation IPA/APK, essai sur téléphone, rappels et autorisations.
