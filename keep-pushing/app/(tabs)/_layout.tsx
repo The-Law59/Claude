@@ -1,6 +1,6 @@
 import { Text } from "react-native";
 import { Tabs } from "expo-router";
-import { c } from "../../src/ui";
+import { useTheme } from "../../src/ui";
 
 const tabs = [
   ["index", "⌂", "Accueil"],
@@ -11,6 +11,7 @@ const tabs = [
 ];
 
 export default function TabsLayout() {
+  const { c } = useTheme();
   return (
     <Tabs
       screenOptions={{

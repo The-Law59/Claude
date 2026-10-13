@@ -3,9 +3,10 @@ import { Platform, Text, View } from "react-native";
 import { protectWeekend, setProtected } from "../../src/model.mjs";
 import { syncReminders } from "../../src/reminders";
 import { useStore } from "../../src/store";
-import { Pills, Screen, Toggle, s } from "../../src/ui";
+import { Pills, Screen, Toggle, useTheme } from "../../src/ui";
 
 export default function Settings() {
+  const { s } = useTheme();
   const { prefs, setPrefs, update, focus } = useStore();
   const [notice, setNotice] = useState("");
   const busy = useRef(false);

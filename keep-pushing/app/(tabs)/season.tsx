@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useStore } from "../../src/store";
-import { Button, Pills, Screen, formatDate, s } from "../../src/ui";
+import { Button, Pills, Screen, formatDate, useTheme } from "../../src/ui";
 
 export default function Season() {
+  const { s } = useTheme();
   const { prefs, season, focus } = useStore();
   const router = useRouter();
   const [tab, setTab] = useState<"calendar" | "drivers" | "teams">("calendar");

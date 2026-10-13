@@ -3,10 +3,11 @@ import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { protectWeekend } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
-import { Button, ResultRows, Screen, Toggle, formatDate, s } from "../../src/ui";
+import { Button, ResultRows, Screen, Toggle, formatDate, useTheme } from "../../src/ui";
 
 // Un Grand Prix : ses sessions, ses résultats, sa protection anti-spoil.
 export default function GrandPrix() {
+  const { s } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { prefs, setPrefs, season, loadResults } = useStore();
   const router = useRouter();

@@ -3,9 +3,10 @@ import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { articleVisible } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
-import { Button, Pills, Screen, formatDate, s } from "../../src/ui";
+import { Button, Pills, Screen, formatDate, useTheme } from "../../src/ui";
 
 export default function Home() {
+  const { s } = useTheme();
   const { prefs, season, focus, loadResults } = useStore();
   useEffect(() => loadResults(focus.last), [focus.last.id]);
   const router = useRouter();

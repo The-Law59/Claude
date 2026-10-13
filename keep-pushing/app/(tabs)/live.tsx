@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { Text } from "react-native";
 import { useStore } from "../../src/store";
-import { ResultRows, Screen, s } from "../../src/ui";
+import { ResultRows, Screen, useTheme } from "../../src/ui";
 
 export default function Live() {
+  const { s } = useTheme();
   const { focus, season, loadResults } = useStore();
   const race = focus.last.sessions.at(-1)!;
   useEffect(() => loadResults(focus.last), [focus.last.id]);

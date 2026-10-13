@@ -1,19 +1,20 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { setProtected } from "./model.mjs";
+import { DEFAULT_ACCENT, accentFor, tint } from "./teams.mjs";
 import { useStore } from "./store";
 
-export const c = {
+const base = {
   bg: "#f5f6f8",
   card: "#ffffff",
   ink: "#202631",
   muted: "#626c79",
-  accent: "#b64025",
+  accent: DEFAULT_ACCENT,
   line: "#dce0e6",
-  soft: "#fbece6",
+  soft: tint(DEFAULT_ACCENT),
   green: "#2e6746",
 };
 export const formatDate = (date: string | number) =>
@@ -25,6 +26,16 @@ export const formatDate = (date: string | number) =>
     minute: "2-digit",
   });
 
+// Thème aux couleurs de « mon écurie » ; recalculé seulement quand elle change.
+export function useTheme() {
+  const { prefs } = useStore();
+  return useMemo(() => {
+    const accent = accentFor(prefs.myTeam);
+    const c = { ...base, accent, soft: tint(accent) };
+    return { c, s: makeStyles(c) };
+  }, [prefs.myTeam]);
+}
+
 export function Button({
   label,
   onPress,
@@ -34,6 +45,7 @@ export function Button({
   onPress: () => void;
   secondary?: boolean;
 }) {
+  const { c, s } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -55,6 +67,7 @@ export function Toggle({
   onChange: (v: boolean) => void;
   detail?: string;
 }) {
+  const { c, s } = useTheme();
   return (
     <View style={s.setting}>
       <View style={{ flex: 1 }}>
@@ -81,6 +94,7 @@ export function Pills<T extends string | number | boolean>({
   value: T;
   onChange: (v: T) => void;
 }) {
+  const { c, s } = useTheme();
   return (
     <View style={s.pills}>
       {options.map(([id, label]) => (
@@ -100,6 +114,7 @@ export function Pills<T extends string | number | boolean>({
 
 // En-tête commun : marque, bouclier anti-spoil, origine des données.
 export function Screen({ children }: { children: React.ReactNode }) {
+  const { c, s } = useTheme();
   const { prefs, season, error } = useStore();
   const router = useRouter();
   const protectedAny = prefs.protectedSessions.length > 0;
@@ -142,6 +157,7 @@ export function Screen({ children }: { children: React.ReactNode }) {
 
 // Classement d'une session, ou verrou si elle est protégée.
 export function ResultRows({ sessionId }: { sessionId: string }) {
+  const { c, s } = useTheme();
   const { prefs, setPrefs, season } = useStore();
   if (prefs.protectedSessions.includes(sessionId))
     return (
@@ -185,7 +201,8 @@ export function ResultRows({ sessionId }: { sessionId: string }) {
   );
 }
 
-export const s = StyleSheet.create({
+const makeStyles = (c: typeof base) =>
+  StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.bg },
   loading: {
     flex: 1,

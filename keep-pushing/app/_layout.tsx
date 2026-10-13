@@ -2,9 +2,10 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
 import { StoreProvider, useStore } from "../src/store";
-import { c, s } from "../src/ui";
+import { useTheme } from "../src/ui";
 
 function Gate() {
+  const { c, s } = useTheme();
   const { ready } = useStore();
   if (!ready)
     return (

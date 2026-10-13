@@ -2,9 +2,10 @@ import { Linking, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { articleVisible } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
-import { Button, Screen, formatDate, s } from "../../src/ui";
+import { Button, Screen, formatDate, useTheme } from "../../src/ui";
 
 export default function Article() {
+  const { s } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { prefs, season } = useStore();
   const router = useRouter();
