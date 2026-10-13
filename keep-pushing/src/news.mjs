@@ -67,8 +67,9 @@ export function toArticle(item, season) {
 
 export async function loadNews(fetchFn = fetch) {
   const feeds = await Promise.allSettled(
-    SOURCES.map(async ({ name, url }) => {
-      const res = await timedFetch(fetchFn, url);
+    SOURCES.map(async ({ name, url }, i) => {
+      // Dans un navigateur, le flux passe par server.mjs (les sources bloquent le CORS).
+      const res = await timedFetch(fetchFn, typeof document === "undefined" ? url : `/api/news/${i}`);
       if (!res.ok) throw new Error(`${name} ${res.status}`);
       return parseRss(await res.text(), name);
     }),

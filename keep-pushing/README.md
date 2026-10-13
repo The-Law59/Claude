@@ -16,7 +16,9 @@ Si la version d’Expo Go ne prend plus en charge SDK 57, mettre à niveau le SD
 
 ## Tester dans le navigateur
 
-`npm run web` ouvre la même interface. Les rappels locaux sont réservés au téléphone.
+`npm run web` : mode développement, sans les actualités (le navigateur bloque les flux RSS). Pour tout avoir : `npx expo export --platform web` puis `npm run serve` (http://localhost:3000), ou Docker : `docker compose up -d`. Installation sur Proxmox : [deploy/README.md](deploy/README.md).
+
+Les rappels locaux sont réservés au téléphone.
 
 ## Fonctionnalités
 
@@ -35,6 +37,7 @@ Si la version d’Expo Go ne prend plus en charge SDK 57, mettre à niveau le SD
 - `src/ui.tsx` : thème, composants communs (en-tête, boutons, interrupteurs, classements).
 - `src/model.mjs` : règles anti-spoil, rappels, choix du week-end en cours. Testables sans téléphone.
 - `src/jolpica.mjs` : lecture de l’API Jolpica vers le modèle de l’app.
+- `server.mjs` : serveur de la version web (fichiers + relais des flux RSS des sources listées, cache 5 min).
 - `src/news.mjs` : sources RSS, lecture des flux, lien des articles aux favoris et aux sessions.
 - `src/data.mjs` : données de démonstration, même forme que la saison réelle.
 - Modèle : compétition → week-end → sessions. Les ids de session incluent le week-end (`f1-2026-19:Race`) : protéger une course ne masque pas les autres Grands Prix, et l’ajout d’autres compétitions se fera par un nouveau fournisseur.
