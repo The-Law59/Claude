@@ -85,11 +85,11 @@ export function parseRound(event, { race, qualifying, sprint }) {
 }
 
 // fetch avec délai maximal : un réseau lent ne bloque pas le démarrage.
-export async function timedFetch(fetchFn, url, timeoutMs = 10000) {
+export async function timedFetch(fetchFn, url, timeoutMs = 10000, init = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    return await fetchFn(url, { signal: ctrl.signal });
+    return await fetchFn(url, { ...init, signal: ctrl.signal });
   } finally {
     clearTimeout(timer);
   }

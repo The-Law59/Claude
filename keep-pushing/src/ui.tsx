@@ -155,6 +155,24 @@ export function Screen({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Fiabilité de la source, toujours visible : vert = officiel, orange = non officiel.
+const BADGES = {
+  official: ["✓ OFFICIEL", "#1d6b3a", "#e3f1e7"],
+  press: ["PRESSE", "#3d4552", "#e8ebef"],
+  unofficial: ["⚠ NON OFFICIEL", "#8a4b00", "#fbeedd"],
+} as const;
+export function SourceBadge({ kind, lang }: { kind?: keyof typeof BADGES; lang?: string }) {
+  const { s } = useTheme();
+  if (!kind) return null;
+  const [label, color, bg] = BADGES[kind];
+  return (
+    <View style={s.badgeRow}>
+      <Text style={[s.badge, { color, backgroundColor: bg }]}>{label}</Text>
+      {lang && lang !== "FR" && <Text style={[s.badge, s.badgeLang]}>{lang}</Text>}
+    </View>
+  );
+}
+
 // Classement d'une session, ou verrou si elle est protégée.
 export function ResultRows({ sessionId }: { sessionId: string }) {
   const { c, s } = useTheme();
@@ -297,6 +315,17 @@ const makeStyles = (c: typeof base) =>
     letterSpacing: 0.8,
     color: c.accent,
   },
+  badgeRow: { flexDirection: "row", gap: 6 },
+  badge: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    overflow: "hidden",
+  },
+  badgeLang: { color: c.muted, backgroundColor: c.line },
   mine: { backgroundColor: c.soft, marginHorizontal: -10, paddingHorizontal: 10, borderRadius: 8 },
   lock: { padding: 18, borderRadius: 14, backgroundColor: "#e7efe8", gap: 8 },
   rank: {

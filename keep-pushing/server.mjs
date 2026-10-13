@@ -26,7 +26,10 @@ async function news(index) {
   if (!source) return { status: 404, body: "Source inconnue" };
   const hit = cache.get(index);
   if (hit && Date.now() - hit.at < TTL) return { status: 200, body: hit.body };
-  const res = await fetch(source.url, { signal: AbortSignal.timeout(10000) });
+  const res = await fetch(source.url, {
+    signal: AbortSignal.timeout(10000),
+    headers: { "user-agent": "KeepPushing/0.3 (veille F1)" },
+  });
   if (!res.ok) return { status: 502, body: `Source ${res.status}` };
   const body = await res.text();
   cache.set(index, { at: Date.now(), body });

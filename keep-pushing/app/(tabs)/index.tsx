@@ -3,7 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { articleVisible } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
-import { Button, Pills, Screen, formatDate, useTheme } from "../../src/ui";
+import { Button, Pills, Screen, SourceBadge, formatDate, useTheme } from "../../src/ui";
 
 export default function Home() {
   const { s } = useTheme();
@@ -11,10 +11,13 @@ export default function Home() {
   useEffect(() => loadResults(focus.last), [focus.last.id]);
   const router = useRouter();
   const [personal, setPersonal] = useState(true);
+  const [kind, setKind] = useState<"all" | "official" | "press" | "unofficial">("all");
   const { current, last } = focus;
   const next = current.sessions.find((x) => Date.parse(x.startsAt) > Date.now());
   const lastRaceProtected = prefs.protectedSessions.includes(last.sessions.at(-1)!.id);
-  const visible = season.articles.filter((a) => articleVisible(a, prefs, personal));
+  const visible = season.articles.filter(
+    (a) => articleVisible(a, prefs, personal) && (kind === "all" || a.kind === kind),
+  );
   const rank = <T extends { id: string }>(list: T[], id: string) => {
     const i = list.findIndex((x) => x.id === id);
     return i < 0 ? null : { ...list[i], position: i + 1 };
@@ -94,6 +97,18 @@ export default function Home() {
         value={personal}
         onChange={setPersonal}
       />
+      {season.articles.some((a) => a.kind) && (
+        <Pills
+          options={[
+            ["all", "Toutes sources"],
+            ["official", "Officielles"],
+            ["press", "Presse"],
+            ["unofficial", "Non officielles"],
+          ]}
+          value={kind}
+          onChange={setKind}
+        />
+      )}
       <Text style={s.heading}>À la une</Text>
       {visible.map((a) => (
         <Pressable
@@ -102,6 +117,7 @@ export default function Home() {
           style={s.card}
           key={a.id}
         >
+          <SourceBadge kind={a.kind} lang={a.lang} />
           <Text style={s.label}>
             {a.rumor ? "RUMEUR · " : ""}
             {a.source

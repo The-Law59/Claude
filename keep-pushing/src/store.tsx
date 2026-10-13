@@ -41,6 +41,9 @@ export type Season = {
 export type Article = (typeof demoSeason.articles)[number] & {
   link?: string;
   source?: string;
+  via?: string;
+  kind?: "official" | "press" | "unofficial";
+  lang?: string;
   publishedAt?: number;
 };
 type Store = {

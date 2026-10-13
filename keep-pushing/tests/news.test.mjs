@@ -44,3 +44,60 @@ test("Chargement : doublons retirés, tri récent d'abord, échec signalé", asy
   assert(items[0].publishedAt >= items[1].publishedAt);
   await assert.rejects(loadNews(async () => ({ ok: false, status: 500 })), /Aucune actualité/);
 });
+
+import { classify, merge } from "../src/news.mjs";
+
+test("Classement des sources : officiel seulement sur liste, inconnu = non officiel", () => {
+  assert.equal(classify("https://www.formula1.com/en/latest/article/x"), "official");
+  assert.equal(classify("https://www.fia.com/news/x"), "official");
+  assert.equal(classify("https://fr.motorsport.com/f1/news/x"), "press");
+  assert.equal(classify("https://www.lequipe.fr/Formule-1/x"), "press");
+  // Imitations et domaines inconnus : jamais « officiel ».
+  assert.equal(classify("https://formula1.com.actu-f1.net/x"), "unofficial");
+  assert.equal(classify("https://myformula1.com/x"), "unofficial");
+  assert.equal(classify("https://blog-f1-rumeurs.fr/x"), "unofficial");
+  assert.equal(classify("pas une url"), "unofficial");
+});
+
+const google = `<rss><channel>
+<item><title>Leclerc prolonge chez Ferrari - L'Équipe</title><link>https://news.google.com/rss/articles/abc</link>
+<pubDate>Tue, 13 Oct 2026 10:00:00 GMT</pubDate><description>&lt;a href="x"&gt;lien&lt;/a&gt;</description>
+<source url="https://www.lequipe.fr">L'Équipe</source></item>
+<item><title>Rumeur folle sur Red Bull - BlogF1</title><link>https://news.google.com/rss/articles/def</link>
+<source url="https://blogf1.example">BlogF1</source></item>
+</channel></rss>`;
+
+test("Agrégateur : chaque article prend le nom et la fiabilité de son vrai site", () => {
+  const [a, b] = parseRss(google, { name: "Google Actualités", kind: "auto" });
+  assert.equal(a.title, "Leclerc prolonge chez Ferrari");
+  assert.equal(a.source, "L'Équipe");
+  assert.equal(a.via, "Google Actualités");
+  assert.equal(a.kind, "press");
+  assert.equal(a.summary, "");
+  assert.equal(b.kind, "unofficial");
+});
+
+test("Atom (Reddit) et filtre F1 des communiqués FIA", () => {
+  const atom = `<feed><entry><title>Race thread</title><link href="https://www.reddit.com/r/formula1/x"/>
+<updated>2026-10-12T20:00:00+00:00</updated><content type="html">&lt;p&gt;Discussion&lt;/p&gt;</content></entry></feed>`;
+  const [r] = parseRss(atom, { name: "Reddit", kind: "unofficial", lang: "EN" });
+  assert.equal(r.link, "https://www.reddit.com/r/formula1/x");
+  assert.equal(r.summary, "Discussion");
+  assert.equal(r.kind, "unofficial");
+  const fia = `<rss><channel><item><title>WRC: rally news</title><link>https://www.fia.com/a</link></item>
+<item><title>Formula 1: decision</title><link>https://www.fia.com/b</link></item></channel></rss>`;
+  assert.deepEqual(
+    parseRss(fia, { name: "FIA", kind: "official", only: /formula 1/i }).map((x) => x.link),
+    ["https://www.fia.com/b"],
+  );
+});
+
+test("Même info dans plusieurs flux : la source la plus fiable gagne", () => {
+  const base = { title: "Leclerc prolonge chez Ferrari", summary: "", publishedAt: 1 };
+  const out = merge([
+    { ...base, link: "https://blog.example/a", kind: "unofficial", source: "Blog" },
+    { ...base, title: "Leclerc prolonge chez Ferrari !", link: "https://www.ferrari.com/a", kind: "official", source: "Ferrari" },
+    { ...base, title: "Autre info", link: "https://x.example/b", kind: "press", source: "X", publishedAt: 2 },
+  ]);
+  assert.deepEqual(out.map((x) => x.source), ["X", "Ferrari"]);
+});
