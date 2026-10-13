@@ -29,7 +29,7 @@ export default function Article() {
             </Text>
             <Text style={s.small}>
               {article.link
-                ? `Source : ${article.source}${article.via ? ` (trouvé via ${article.via})` : ""} · ${formatDate(article.publishedAt!)}`
+                ? `Source : ${article.source}${article.via ? ` (trouvé via ${article.via})` : ""} · ${article.dated === false ? "date non fournie par la source" : formatDate(article.publishedAt!)}`
                 : "Article fictif de démonstration."}
             </Text>
           </View>

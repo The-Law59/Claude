@@ -121,7 +121,7 @@ export default function Home() {
           <Text style={s.label}>
             {a.rumor ? "RUMEUR · " : ""}
             {a.source
-              ? `${a.source.toUpperCase()} · ${formatDate(a.publishedAt!)}`
+              ? `${a.source.toUpperCase()}${a.dated === false ? "" : ` · ${formatDate(a.publishedAt!)}`}`
               : a.rumor
                 ? "NON CONFIRMÉE"
                 : "ACTUALITÉ · DÉMONSTRATION"}

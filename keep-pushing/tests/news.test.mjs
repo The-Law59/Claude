@@ -101,3 +101,14 @@ test("Même info dans plusieurs flux : la source la plus fiable gagne", () => {
   ]);
   assert.deepEqual(out.map((x) => x.source), ["X", "Ferrari"]);
 });
+
+test("Cas réels : Reddit doublement encodé, Formula1.com sans date", () => {
+  const reddit = `<feed><entry><title>Race thread</title><link href="https://www.reddit.com/r/formula1/y"/>
+<content type="html">&lt;div&gt;Great race&amp;amp;#32;today&lt;/div&gt; &amp;#32; submitted by &amp;#32; &lt;a href="u"&gt; /u/someone &lt;/a&gt; &lt;span&gt;[link]&lt;/span&gt;</content></entry></feed>`;
+  assert.equal(parseRss(reddit, { name: "Reddit", kind: "unofficial" })[0].summary, "Great race today");
+  const f1 = `<rss><channel><item><title>News</title><description>Texte</description>
+<link>https://www.formula1.com/en/latest/article/x</link></item></channel></rss>`;
+  const [x] = parseRss(f1, { name: "Formula1.com", kind: "official" }, 42);
+  assert.equal(x.dated, false);
+  assert.equal(x.publishedAt, 42); // considéré récent : masqué si une session est protégée
+});

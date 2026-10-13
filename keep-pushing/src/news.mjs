@@ -46,6 +46,22 @@ export const PRESS_DOMAINS = [
   "reuters.com",
   "apnews.com",
   "racefans.net",
+  // Rédactions identifiées relevées dans Google Actualités.
+  "franceinfo.fr",
+  "rtl.fr",
+  "rfi.fr",
+  "cnews.fr",
+  "tv5monde.com",
+  "ledauphine.com",
+  "nicematin.com",
+  "laprovence.com",
+  "lejsl.com",
+  "dhnet.be",
+  "lapresse.ca",
+  "jeuneafrique.com",
+  "actu.fr",
+  "sportauto.fr",
+  "franceracing.fr",
 ];
 // Domaine exact ou sous-domaine : « formula1.com.exemple.net » ne passe pas.
 const matches = (host, domains) => domains.some((d) => host === d || host.endsWith(`.${d}`));
@@ -65,7 +81,7 @@ export function classify(url) {
 export const SOURCES = [
   // Flux gratuits offerts aux visiteurs : https://fr.motorsport.com/rss/
   { name: "Motorsport.com", url: "https://fr.motorsport.com/rss/f1/news/", kind: "press" },
-  { name: "Formula1.com", url: "https://www.formula1.com/content/fom-website/en/latest/all.xml", kind: "official", lang: "EN" },
+  { name: "Formula1.com", url: "https://www.formula1.com/en/latest/all.xml", kind: "official", lang: "EN" },
   // Communiqués FIA toutes disciplines : on ne garde que la F1.
   { name: "FIA", url: "https://www.fia.com/rss/press-release", kind: "official", lang: "EN", only: /formula 1|formula one|\bf1\b/i },
   { name: "RMC Sport", url: "https://rmcsport.bfmtv.com/rss/auto-moto/f1/", kind: "press" },
@@ -77,17 +93,21 @@ const PER_SOURCE = 25;
 const RANK = { official: 0, press: 1, unofficial: 2 };
 
 const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-const clean = (s = "") =>
-  s
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, e) =>
-      e[0] === "#"
-        ? String.fromCodePoint(e[1].toLowerCase() === "x" ? parseInt(e.slice(2), 16) : Number(e.slice(1)))
-        : ENTITIES[e.toLowerCase()] ?? m,
-    )
-    .replace(/<[^>]*>/g, " ")
+const decode = (s) =>
+  s.replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, e) =>
+    e[0] === "#"
+      ? String.fromCodePoint(e[1].toLowerCase() === "x" ? parseInt(e.slice(2), 16) : Number(e.slice(1)))
+      : ENTITIES[e.toLowerCase()] ?? m,
+  );
+// Certains flux (Reddit) encodent leur HTML deux fois : on décode jusqu'à stabilité.
+const clean = (s = "") => {
+  let t = s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
+  for (let i = 0; i < 3; i++) t = decode(t).replace(/<[^>]*>/g, " ");
+  return t
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    .replace(/ ?submitted by \/u\/\S+ \[link\]( \[comments\])?$/, ""); // pied de message Reddit
+};
 
 export function parseRss(xml, feed, now = Date.now()) {
   const { name, kind = "unofficial", lang = "FR", only } = typeof feed === "string" ? { name: feed } : feed;
@@ -100,6 +120,7 @@ export function parseRss(xml, feed, now = Date.now()) {
       // Agrégateur : site d'origine dans <source url="…">Nom</source>.
       const origin = item.match(/<source\b[^>]*url="([^"]+)"[^>]*>([\s\S]*?)<\/source>/);
       const outlet = origin ? clean(origin[2]) : name;
+      const date = Date.parse(get("pubDate") || get("published") || get("updated"));
       let title = get("title");
       if (origin && title.endsWith(` - ${outlet}`)) title = title.slice(0, -outlet.length - 3);
       // Retire le lien « Continuez de lire » que certains flux ajoutent au résumé.
@@ -111,7 +132,8 @@ export function parseRss(xml, feed, now = Date.now()) {
         link,
         summary: summary.length > 320 ? `${summary.slice(0, 317)}…` : summary,
         // Date absente ou illisible : on la considère récente, donc masquée en anti-spoil.
-        publishedAt: Date.parse(get("pubDate") || get("published") || get("updated")) || now,
+        publishedAt: date || now,
+        dated: !!date,
         source: outlet,
         via: origin ? name : undefined,
         kind: kind === "auto" ? classify(origin?.[1] ?? link) : kind,
@@ -140,6 +162,7 @@ export function toArticle(item, season) {
     kind: item.kind,
     lang: item.lang,
     publishedAt: item.publishedAt,
+    dated: item.dated,
     tags: [
       ...season.drivers.filter((d) => has(text, d.name.split(" ").at(-1))),
       ...season.teams.filter((t) => has(text, t.name)),

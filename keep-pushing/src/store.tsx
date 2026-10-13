@@ -45,6 +45,7 @@ export type Article = (typeof demoSeason.articles)[number] & {
   kind?: "official" | "press" | "unofficial";
   lang?: string;
   publishedAt?: number;
+  dated?: boolean;
 };
 type Store = {
   prefs: Prefs;
