@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Keep Pushing",
+    "slug": "keep-pushing",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.keeppushing.mobile"
+    },
+    "android": {
+      "package": "com.keeppushing.mobile"
+    },
+    "plugins": ["expo-notifications", "expo-status-bar"]
+  }
+}
