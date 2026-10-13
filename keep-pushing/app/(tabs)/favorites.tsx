@@ -2,53 +2,60 @@ import { Pressable, Text, View } from "react-native";
 import { setMine } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
 import { Screen, Toggle, useTheme } from "../../src/ui";
+import { accentFor } from "../../src/teams.mjs";
 
 export default function Favorites() {
-  const { c, s } = useTheme();
+  const { s } = useTheme();
   const { prefs, setPrefs, update, season } = useStore();
   const toggle = (id: string, on: boolean) =>
     update({
       favorites: on ? [...prefs.favorites, id] : prefs.favorites.filter((x) => x !== id),
     });
-  const lists = [
-    ["Pilotes", "myDriver", "mon pilote", season.drivers],
-    ["Écuries", "myTeam", "mon écurie", season.teams],
+  // Choix principal : un seul pilote, une seule écurie (qui colore l'app).
+  const pickers = [
+    ["Mon écurie", "myTeam", season.teams],
+    ["Mon pilote", "myDriver", season.drivers],
   ] as const;
   return (
     <Screen>
       <Text style={s.title}>Votre paddock.</Text>
-      <Text style={s.subtitle}>
-        ★ choisit votre pilote et votre écurie : l’app prend la couleur de votre écurie.
-        Les interrupteurs ajoutent d’autres favoris pour filtrer les actualités.
-      </Text>
-      {lists.map(([title, key, label, list]) => (
+      <Text style={s.subtitle}>Touchez pour choisir. L’app prend la couleur de votre écurie.</Text>
+      {pickers.map(([title, key, list]) => (
         <View key={key}>
           <Text style={s.heading}>{title}</Text>
-          {list.map((f) => {
-            const mine = prefs[key] === f.id;
-            return (
-              <View key={f.id} style={[s.favRow, mine && s.mine]}>
+          <View style={s.pills}>
+            {list.map((f) => {
+              const selected = prefs[key] === f.id;
+              // Chaque écurie s'affiche dans sa couleur ; un pilote dans celle de son écurie.
+              const color = accentFor("teamId" in f ? f.teamId : f.id);
+              return (
                 <Pressable
+                  key={f.id}
                   accessibilityRole="button"
-                  accessibilityLabel={`Choisir ${f.name} comme ${label}`}
-                  accessibilityState={{ selected: mine }}
-                  onPress={() => setPrefs((p) => setMine(p, key, mine ? "" : f.id))}
-                  style={s.star}
+                  accessibilityLabel={`${title} : ${f.name}`}
+                  accessibilityState={{ selected }}
+                  onPress={() => setPrefs((p) => setMine(p, key, selected ? "" : f.id))}
+                  style={[s.pill, { borderColor: color }, selected && { backgroundColor: color }]}
                 >
-                  <Text style={{ fontSize: 22, color: mine ? c.accent : c.line }}>★</Text>
+                  <Text style={selected ? s.pillTextActive : [s.text, { color }]}>
+                    {selected ? "★ " : ""}
+                    {f.name}
+                  </Text>
                 </Pressable>
-                <View style={{ flex: 1 }}>
-                  <Toggle
-                    label={f.name}
-                    detail={mine ? label.charAt(0).toUpperCase() + label.slice(1) : undefined}
-                    value={prefs.favorites.includes(f.id)}
-                    onChange={(on) => toggle(f.id, on)}
-                  />
-                </View>
-              </View>
-            );
-          })}
+              );
+            })}
+          </View>
         </View>
+      ))}
+      <Text style={s.heading}>Autres favoris</Text>
+      <Text style={s.small}>Pour filtrer les actualités « Pour vous ».</Text>
+      {[...season.drivers, ...season.teams].map((f) => (
+        <Toggle
+          key={f.id}
+          label={f.name}
+          value={prefs.favorites.includes(f.id)}
+          onChange={(on) => toggle(f.id, on)}
+        />
       ))}
       <Text style={s.small}>Vos choix sont enregistrés sur cet appareil.</Text>
     </Screen>

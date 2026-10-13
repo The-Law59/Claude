@@ -297,8 +297,6 @@ const makeStyles = (c: typeof base) =>
     letterSpacing: 0.8,
     color: c.accent,
   },
-  favRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  star: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   mine: { backgroundColor: c.soft, marginHorizontal: -10, paddingHorizontal: 10, borderRadius: 8 },
   lock: { padding: 18, borderRadius: 14, backgroundColor: "#e7efe8", gap: 8 },
   rank: {
