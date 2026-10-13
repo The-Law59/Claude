@@ -46,6 +46,8 @@ export type Article = (typeof demoSeason.articles)[number] & {
   lang?: string;
   publishedAt?: number;
   dated?: boolean;
+  translatedFrom?: string;
+  originalTitle?: string;
 };
 type Store = {
   prefs: Prefs;
@@ -89,7 +91,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     ]).then(([raw, loaded, news]) => {
       if (!alive) return;
       // Sans flux : articles fictifs en démo, aucun en mode réel.
-      if (news) loaded = { ...loaded, articles: news.map((n) => toArticle(n, loaded)) };
+      if (news) loaded = { ...loaded, articles: news.map((n: Parameters<typeof toArticle>[0]) => toArticle(n, loaded)) };
       setSeason(loaded);
       if (raw)
         setPrefs(restorePreferences(raw, loaded.events.flatMap((e) => e.sessions)));

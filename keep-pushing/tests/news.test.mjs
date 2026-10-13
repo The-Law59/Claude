@@ -112,3 +112,12 @@ test("Cas réels : Reddit doublement encodé, Formula1.com sans date", () => {
   assert.equal(x.dated, false);
   assert.equal(x.publishedAt, 42); // considéré récent : masqué si une session est protégée
 });
+
+test("Un article traduit garde la trace de sa langue et de son titre d'origine", () => {
+  const a = toArticle(
+    { title: "Titre FR", summary: "", link: "https://x.example/t", publishedAt: 1, kind: "official", lang: "FR", translatedFrom: "EN", originalTitle: "EN title" },
+    demoSeason,
+  );
+  assert.equal(a.translatedFrom, "EN");
+  assert.equal(a.originalTitle, "EN title");
+});

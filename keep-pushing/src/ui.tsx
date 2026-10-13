@@ -161,14 +161,26 @@ const BADGES = {
   press: ["PRESSE", "#3d4552", "#e8ebef"],
   unofficial: ["⚠ NON OFFICIEL", "#8a4b00", "#fbeedd"],
 } as const;
-export function SourceBadge({ kind, lang }: { kind?: keyof typeof BADGES; lang?: string }) {
+export function SourceBadge({
+  kind,
+  lang,
+  translated,
+}: {
+  kind?: keyof typeof BADGES;
+  lang?: string;
+  translated?: boolean;
+}) {
   const { s } = useTheme();
   if (!kind) return null;
   const [label, color, bg] = BADGES[kind];
   return (
     <View style={s.badgeRow}>
       <Text style={[s.badge, { color, backgroundColor: bg }]}>{label}</Text>
-      {lang && lang !== "FR" && <Text style={[s.badge, s.badgeLang]}>{lang}</Text>}
+      {translated ? (
+        <Text style={[s.badge, s.badgeLang]}>TRADUIT DE L’ANGLAIS</Text>
+      ) : (
+        lang && lang !== "FR" && <Text style={[s.badge, s.badgeLang]}>{lang}</Text>
+      )}
     </View>
   );
 }

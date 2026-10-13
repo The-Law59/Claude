@@ -163,6 +163,8 @@ export function toArticle(item, season) {
     lang: item.lang,
     publishedAt: item.publishedAt,
     dated: item.dated,
+    translatedFrom: item.translatedFrom,
+    originalTitle: item.originalTitle,
     tags: [
       ...season.drivers.filter((d) => has(text, d.name.split(" ").at(-1))),
       ...season.teams.filter((t) => has(text, t.name)),
@@ -186,12 +188,13 @@ export function merge(items) {
   return [...best.values()].sort((a, b) => b.publishedAt - a.publishedAt).slice(0, 80);
 }
 
-export async function loadNews(fetchFn = fetch) {
+// Lecture directe des flux (mobile, ou serveur).
+export async function fetchFeeds(fetchFn = fetch) {
   const feeds = await Promise.allSettled(
-    SOURCES.map(async (feed, i) => {
-      // Dans un navigateur, le flux passe par server.mjs (les sources bloquent le CORS).
-      const url = typeof document === "undefined" ? feed.url : `/api/news/${i}`;
-      const res = await timedFetch(fetchFn, url, 10000, { headers: { "user-agent": "KeepPushing/0.3 (veille F1)" } });
+    SOURCES.map(async (feed) => {
+      const res = await timedFetch(fetchFn, feed.url, 10000, {
+        headers: { "user-agent": "KeepPushing/0.3 (veille F1)" },
+      });
       if (!res.ok) throw new Error(`${feed.name} ${res.status}`);
       return parseRss(await res.text(), feed);
     }),
@@ -199,4 +202,14 @@ export async function loadNews(fetchFn = fetch) {
   const items = feeds.flatMap((f) => (f.status === "fulfilled" ? f.value : []));
   if (!items.length) throw new Error("Aucune actualité chargée");
   return merge(items);
+}
+
+// Avec un serveur (navigateur, ou EXPO_PUBLIC_API_URL sur mobile) : liste déjà
+// fusionnée et traduite en français par server.mjs. Sinon, flux lus directement.
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
+export async function loadNews(fetchFn = fetch) {
+  if (typeof document === "undefined" && !API_URL) return fetchFeeds(fetchFn);
+  const res = await timedFetch(fetchFn, `${API_URL}/api/news.json`, 60000);
+  if (!res.ok) throw new Error(`Serveur ${res.status}`);
+  return res.json();
 }

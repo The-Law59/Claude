@@ -1,10 +1,13 @@
-// Serveur de la version web : sert l'export statique (dist/) et relaie les
-// flux RSS, que les navigateurs bloquent (pas d'en-tête CORS côté sources).
-// Seules les sources listées dans src/news.mjs sont relayées : pas de proxy ouvert.
+// Serveur de la version web : sert l'export statique (dist/) et la veille
+// actualités (/api/news.json), que les navigateurs ne peuvent pas lire eux-mêmes
+// (pas d'en-tête CORS côté sources). Les articles anglais sont traduits en
+// français si ANTHROPIC_API_KEY est défini.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
-import { SOURCES } from "./src/news.mjs";
+import Anthropic from "@anthropic-ai/sdk";
+import { fetchFeeds } from "./src/news.mjs";
+import { createTranslator } from "./src/translate.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
 const PORT = Number(process.env.PORT) || 3000;
@@ -18,32 +21,51 @@ const TYPES = {
   ".svg": "image/svg+xml",
   ".ttf": "font/ttf",
 };
-const cache = new Map(); // index de source -> { at, body }
-const TTL = 5 * 60 * 1000;
 
-async function news(index) {
-  const source = SOURCES[index];
-  if (!source) return { status: 404, body: "Source inconnue" };
-  const hit = cache.get(index);
-  if (hit && Date.now() - hit.at < TTL) return { status: 200, body: hit.body };
-  const res = await fetch(source.url, {
-    signal: AbortSignal.timeout(10000),
-    headers: { "user-agent": "KeepPushing/0.3 (veille F1)" },
-  });
-  if (!res.ok) return { status: 502, body: `Source ${res.status}` };
-  const body = await res.text();
-  cache.set(index, { at: Date.now(), body });
-  return { status: 200, body };
+const translate = process.env.ANTHROPIC_API_KEY
+  ? await createTranslator({
+      client: new Anthropic(),
+      cacheFile: join(import.meta.dirname, "data", "translations.json"),
+    })
+  : null;
+if (!translate) console.warn("ANTHROPIC_API_KEY absent : actualités anglaises non traduites.");
+
+// Veille rafraîchie toutes les 5 min en tâche de fond : une requête ne
+// patiente jamais pendant une traduction.
+let latest = null;
+let running = false;
+let ready;
+const firstLoad = new Promise((r) => (ready = r));
+async function refresh() {
+  if (running) return;
+  running = true;
+  try {
+    const items = await fetchFeeds();
+    // Premier démarrage : version anglaise servie tout de suite, traduite ensuite.
+    if (!latest) latest = items;
+    ready();
+    if (translate) latest = await translate(items);
+    else latest = items;
+  } catch (e) {
+    console.warn(`Veille : ${e.message}`);
+    ready();
+  } finally {
+    running = false;
+  }
 }
+refresh();
+setInterval(refresh, 5 * 60 * 1000);
 
 createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, "http://x").pathname);
   try {
-    const match = path.match(/^\/api\/news\/(\d+)$/);
-    if (match) {
-      const { status, body } = await news(Number(match[1]));
-      res.writeHead(status, { "content-type": "application/xml; charset=utf-8" });
-      return res.end(body);
+    if (path === "/api/news.json") {
+      if (!latest) await firstLoad;
+      res.writeHead(latest ? 200 : 503, {
+        "content-type": "application/json; charset=utf-8",
+        "access-control-allow-origin": "*",
+      });
+      return res.end(JSON.stringify(latest ?? []));
     }
     // normalize + préfixe : empêche de sortir de dist/ avec « .. ».
     const file = normalize(join(DIST, path));

@@ -25,7 +25,24 @@ Le script installe Docker, télécharge le projet dans `/opt/keep-pushing`,
 construit l'app (quelques minutes la première fois) et affiche son adresse,
 par exemple `http://192.168.1.50:3000`. Relancer la même commande met l'app à jour.
 
-## 3. Sur le téléphone
+## 3. Traduction des actualités anglaises (facultatif)
+
+Les articles en anglais (Formula1.com, FIA, Reddit) sont traduits en français
+par l'API Claude si une clé est fournie. Sans clé, ils restent en anglais.
+
+1. Créer une clé sur https://console.anthropic.com (Settings → API Keys) et,
+   par prudence, fixer une limite de dépense mensuelle (Settings → Limits).
+2. Dans la console du conteneur :
+   ```bash
+   echo 'ANTHROPIC_API_KEY=sk-ant-...' > /opt/keep-pushing/keep-pushing/.env
+   chmod 600 /opt/keep-pushing/keep-pushing/.env
+   ```
+   (remplacer `sk-ant-...` par votre clé ; ne la partagez jamais ailleurs).
+3. Relancer la commande d'installation pour redémarrer l'app.
+
+Chaque article n'est traduit qu'une fois (cache conservé entre les mises à jour).
+
+## 4. Sur le téléphone
 
 1. Même Wi-Fi que le serveur : ouvrir `http://<IP du conteneur>:3000`.
 2. Ajouter à l'écran d'accueil :

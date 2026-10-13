@@ -117,7 +117,7 @@ export default function Home() {
           style={s.card}
           key={a.id}
         >
-          <SourceBadge kind={a.kind} lang={a.lang} />
+          <SourceBadge kind={a.kind} lang={a.lang} translated={!!a.translatedFrom} />
           <Text style={s.label}>
             {a.rumor ? "RUMEUR · " : ""}
             {a.source
