@@ -53,7 +53,11 @@ export default function Season() {
                 style={s.smallButton}
               >
                 <Text style={s.link}>
-                  {prefs.protectedSessions.includes(x.id) ? "Protégée" : "Résultat"}
+                  {prefs.protectedSessions.includes(x.id)
+                    ? "Protégée"
+                    : Date.parse(x.startsAt) > Date.now()
+                      ? "À venir"
+                      : "Résultat"}
                 </Text>
               </Pressable>
             </View>
