@@ -16,8 +16,8 @@ export const c = {
   soft: "#fbece6",
   green: "#2e6746",
 };
-export const formatDate = (iso: string) =>
-  new Date(iso).toLocaleString("fr-FR", {
+export const formatDate = (date: string | number) =>
+  new Date(date).toLocaleString("fr-FR", {
     weekday: "short",
     day: "numeric",
     month: "short",

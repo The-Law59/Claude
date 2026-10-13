@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { demoSeason } from "./data.mjs";
 import { loadSeason } from "./jolpica.mjs";
+import { loadNews, toArticle } from "./news.mjs";
 import { defaults, focusEvents, restorePreferences } from "./model.mjs";
 
 const KEY = "keep-pushing.preferences.v1";
@@ -24,7 +25,12 @@ export type Season = {
   results: Record<string, Row[]>;
   drivers: { id: string; name: string; team: string; points: number }[];
   teams: { id: string; name: string; points: number }[];
-  articles: typeof demoSeason.articles;
+  articles: Article[];
+};
+export type Article = (typeof demoSeason.articles)[number] & {
+  link?: string;
+  source?: string;
+  publishedAt?: number;
 };
 type Store = {
   prefs: Prefs;
@@ -53,8 +59,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }),
       // shortcut: sans réseau on retombe sur la démo, pas de cache hors ligne ; à ajouter si besoin.
       loadSeason().catch(() => demoSeason) as Promise<Season>,
-    ]).then(([raw, loaded]) => {
+      loadNews().catch(() => null),
+    ]).then(([raw, loaded, news]) => {
       if (!alive) return;
+      // Sans flux : articles fictifs en démo, aucun en mode réel.
+      if (news) loaded = { ...loaded, articles: news.map((n) => toArticle(n, loaded)) };
       setSeason(loaded);
       if (raw)
         setPrefs(restorePreferences(raw, loaded.events.flatMap((e) => e.sessions)));

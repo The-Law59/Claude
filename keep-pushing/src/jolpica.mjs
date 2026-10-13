@@ -68,17 +68,22 @@ export function parseSeason({ schedule, results, qualifying, drivers, teams }) {
   };
 }
 
-export async function loadSeason(fetchFn = fetch, timeoutMs = 10000) {
+// fetch avec délai maximal : un réseau lent ne bloque pas le démarrage.
+export async function timedFetch(fetchFn, url, timeoutMs = 10000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetchFn(url, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function loadSeason(fetchFn = fetch) {
   const get = async (path) => {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const res = await fetchFn(`${API}${path}`, { signal: ctrl.signal });
-      if (!res.ok) throw new Error(`Jolpica ${res.status} sur ${path}`);
-      return (await res.json()).MRData;
-    } finally {
-      clearTimeout(timer);
-    }
+    const res = await timedFetch(fetchFn, `${API}${path}`);
+    if (!res.ok) throw new Error(`Jolpica ${res.status} sur ${path}`);
+    return (await res.json()).MRData;
   };
   const [schedule, results, qualifying, drivers, teams] = await Promise.all(
     [

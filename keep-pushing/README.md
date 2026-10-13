@@ -21,7 +21,9 @@ Si la version d’Expo Go ne prend plus en charge SDK 57, mettre à niveau le SD
 ## Fonctionnalités
 
 - Calendrier, résultats de la dernière course et des qualifications, classements pilotes et écuries réels via l’API publique [Jolpica](https://github.com/jolpica/jolpica-f1) (sans clé). Sans réseau, l’app bascule sur les données de démonstration, signalées en haut de l’écran.
-- Accueil : prochain Grand Prix et prochaine session, fil d’actualités filtré par favoris. Les actualités restent fictives tant qu’aucune source n’est branchée.
+- Accueil : prochain Grand Prix et prochaine session, fil d’actualités filtré par favoris.
+- Actualités F1 en français depuis le flux RSS public de [Motorsport.com](https://fr.motorsport.com/rss/) : titre, extrait et lien vers l’article d’origine. Les favoris sont reconnus dans le texte (nom du pilote, de l’écurie). Ajouter une source : une ligne dans `src/news.mjs`. Dans le navigateur (`npm run web`), le flux peut être bloqué par la politique CORS du site ; l’app mobile n’est pas concernée.
+- Anti-spoil des actualités, règle prudente : un article publié après le début d’une session protégée est masqué, quel que soit son sujet.
 - Anti-spoil par session ou par week-end, pour le dernier et le prochain Grand Prix. Articles liés et résultats masqués ; classements masqués dès qu’une session est protégée.
 - Favoris (liste des pilotes et écuries de la saison) et réglages enregistrés sur l’appareil, sans compte.
 - Rappels locaux neutres à 10, 30 ou 60 minutes pour les sessions du prochain Grand Prix.
@@ -33,6 +35,7 @@ Si la version d’Expo Go ne prend plus en charge SDK 57, mettre à niveau le SD
 - `src/ui.tsx` : thème, composants communs (en-tête, boutons, interrupteurs, classements).
 - `src/model.mjs` : règles anti-spoil, rappels, choix du week-end en cours. Testables sans téléphone.
 - `src/jolpica.mjs` : lecture de l’API Jolpica vers le modèle de l’app.
+- `src/news.mjs` : sources RSS, lecture des flux, lien des articles aux favoris et aux sessions.
 - `src/data.mjs` : données de démonstration, même forme que la saison réelle.
 - Modèle : compétition → week-end → sessions. Les ids de session incluent le week-end (`f1-2026-19:Race`) : protéger une course ne masque pas les autres Grands Prix, et l’ajout d’autres compétitions se fera par un nouveau fournisseur.
 
@@ -42,7 +45,7 @@ Si la version d’Expo Go ne prend plus en charge SDK 57, mettre à niveau le SD
 
 ## Étape suivante
 
-Brancher un service d’actualités autorisé (résumés français et sources). Chaque article doit référencer toutes les sessions qu’il peut révéler ; en cas de doute, le masquer quand l’anti-spoil est actif. Les notifications distantes devront appliquer la protection côté serveur avant envoi. Ajouter un cache hors ligne de la dernière saison chargée.
+Ajouter d’autres sources d’actualités après accord ou vérification de leurs conditions (L’Équipe réserve ses flux RSS à un usage personnel). Les notifications distantes devront appliquer la protection côté serveur avant envoi. Ajouter un cache hors ligne de la dernière saison chargée.
 
 Le direct et la position des voitures sur le circuit nécessitent une source dont les droits de redistribution et le coût ont été validés. Ne jamais inclure de clé privée de fournisseur dans l’application mobile. Les comptes et la synchronisation viendront ensuite.
 

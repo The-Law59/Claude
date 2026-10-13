@@ -55,7 +55,12 @@ export default function Home() {
           key={a.id}
         >
           <Text style={s.label}>
-            {a.rumor ? "RUMEUR · NON CONFIRMÉE" : "ACTUALITÉ · DÉMONSTRATION"}
+            {a.rumor ? "RUMEUR · " : ""}
+            {a.source
+              ? `${a.source.toUpperCase()} · ${formatDate(a.publishedAt!)}`
+              : a.rumor
+                ? "NON CONFIRMÉE"
+                : "ACTUALITÉ · DÉMONSTRATION"}
           </Text>
           <Text style={s.cardTitle}>{a.title}</Text>
           <Text style={s.small}>Lire le résumé →</Text>
@@ -74,8 +79,7 @@ export default function Home() {
             </>
           ) : (
             <Text style={s.text}>
-              Les actualités arrivent bientôt : aucune source d’actualités n’est encore
-              branchée.
+              Actualités indisponibles pour le moment. Vérifiez votre connexion.
             </Text>
           )}
         </View>

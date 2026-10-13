@@ -1,8 +1,8 @@
-import { Text, View } from "react-native";
+import { Linking, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { articleVisible } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
-import { Button, Screen, s } from "../../src/ui";
+import { Button, Screen, formatDate, s } from "../../src/ui";
 
 export default function Article() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,9 +24,17 @@ export default function Article() {
           <View style={s.card}>
             <Text style={s.text}>{article.summary}</Text>
             <Text style={s.small}>
-              Article fictif. Les sources seront reliées dans la prochaine étape.
+              {article.link
+                ? `Source : ${article.source} · ${formatDate(article.publishedAt!)}`
+                : "Article fictif de démonstration."}
             </Text>
           </View>
+          {!!article.link && (
+            <Button
+              label={`Lire l’article sur ${article.source} →`}
+              onPress={() => Linking.openURL(article.link!)}
+            />
+          )}
         </>
       ) : (
         <View style={s.lock}>
