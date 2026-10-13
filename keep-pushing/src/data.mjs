@@ -14,18 +14,27 @@ export const events = [
   {
     id: EVENT,
     competition: "f1",
+    season: "2026",
+    round: 1,
     name: "Grand Prix d’Italie",
     circuit: "Circuit de démonstration",
+    winner: null,
     sessions,
   },
 ];
 export const drivers = [
-  ["lando_norris", "Lando Norris", "McLaren", 250],
-  ["max_verstappen", "Max Verstappen", "Red Bull", 238],
-  ["leclerc", "Charles Leclerc", "Ferrari", 210],
-  ["piastri", "Oscar Piastri", "McLaren", 205],
-  ["russell", "George Russell", "Mercedes", 180],
-].map(([id, name, team, points]) => ({ id: `driver-${id}`, name, team, points }));
+  ["lando_norris", "Lando Norris", "McLaren", "mclaren", 250],
+  ["max_verstappen", "Max Verstappen", "Red Bull", "red_bull", 238],
+  ["leclerc", "Charles Leclerc", "Ferrari", "ferrari", 210],
+  ["piastri", "Oscar Piastri", "McLaren", "mclaren", 205],
+  ["russell", "George Russell", "Mercedes", "mercedes", 180],
+].map(([id, name, team, teamId, points]) => ({
+  id: `driver-${id}`,
+  name,
+  team,
+  teamId: `team-${teamId}`,
+  points,
+}));
 export const teams = [
   ["mclaren", "McLaren", 455],
   ["red_bull", "Red Bull", 330],
@@ -99,6 +108,7 @@ export const results = Object.fromEntries(
       : [race[(i + 2) % 5], ...race.filter((_, j) => j !== (i + 2) % 5)]
     ).map((r, j) => ({
       position: j + 1,
+      driverId: drivers.find((d) => d.name === r[0]).id,
       name: r[0],
       team: r[1],
       value: s.type === "Race" ? r[2] : `1:2${j}.45${i}`,

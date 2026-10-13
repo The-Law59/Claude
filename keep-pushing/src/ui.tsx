@@ -156,16 +156,23 @@ export function ResultRows({ sessionId }: { sessionId: string }) {
       </View>
     );
   const rows = season.results[sessionId];
-  if (!rows?.length)
+  if (!rows?.length) {
+    const session = season.events.flatMap((e) => e.sessions).find((x) => x.id === sessionId);
+    const message = !session || Date.parse(session.startsAt) > Date.now()
+      ? "Session à venir."
+      : /Practice|SprintQualifying/.test(session.type)
+        ? "Pas de classement disponible pour cette session."
+        : "Chargement des résultats…";
     return (
       <View style={s.card}>
-        <Text style={s.text}>Aucun résultat disponible pour cette session.</Text>
+        <Text style={s.text}>{message}</Text>
       </View>
     );
+  }
   return (
     <View style={s.card}>
       {rows.map((r) => (
-        <View style={s.rank} key={r.position}>
+        <View style={[s.rank, r.driverId === prefs.myDriver && s.mine]} key={r.position}>
           <Text style={s.position}>{r.position}</Text>
           <View style={{ flex: 1 }}>
             <Text style={s.text}>{r.name}</Text>
@@ -273,6 +280,9 @@ export const s = StyleSheet.create({
     letterSpacing: 0.8,
     color: c.accent,
   },
+  favRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  star: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  mine: { backgroundColor: c.soft, marginHorizontal: -10, paddingHorizontal: 10, borderRadius: 8 },
   lock: { padding: 18, borderRadius: 14, backgroundColor: "#e7efe8", gap: 8 },
   rank: {
     flexDirection: "row",

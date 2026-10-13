@@ -1,10 +1,12 @@
+import { useEffect } from "react";
 import { Text } from "react-native";
 import { useStore } from "../../src/store";
 import { ResultRows, Screen, s } from "../../src/ui";
 
 export default function Live() {
-  const { focus, season } = useStore();
+  const { focus, season, loadResults } = useStore();
   const race = focus.last.sessions.at(-1)!;
+  useEffect(() => loadResults(focus.last), [focus.last.id]);
   return (
     <Screen>
       <Text style={s.title}>La course.</Text>

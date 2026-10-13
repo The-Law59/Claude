@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { demoSeason } from "./data.mjs";
-import { loadSeason } from "./jolpica.mjs";
+import { loadRound, loadSeason } from "./jolpica.mjs";
 import { loadNews, toArticle } from "./news.mjs";
 import { defaults, focusEvents, restorePreferences } from "./model.mjs";
 
@@ -9,6 +9,8 @@ const KEY = "keep-pushing.preferences.v1";
 export type Prefs = {
   version: number;
   favorites: string[];
+  myDriver: string;
+  myTeam: string;
   protectedSessions: string[];
   frequency: string;
   rumors: boolean;
@@ -17,13 +19,22 @@ export type Prefs = {
   results: boolean;
 };
 export type Session = { id: string; type: string; label: string; startsAt: string };
-export type Event = { id: string; competition: string; name: string; circuit: string; sessions: Session[] };
-type Row = { position: number; name: string; team: string; value: string };
+type Row = { position: number; driverId: string; name: string; team: string; value: string };
+export type Event = {
+  id: string;
+  competition: string;
+  season: string;
+  round: number;
+  name: string;
+  circuit: string;
+  winner: Row | null;
+  sessions: Session[];
+};
 export type Season = {
   mode: string;
   events: Event[];
   results: Record<string, Row[]>;
-  drivers: { id: string; name: string; team: string; points: number }[];
+  drivers: { id: string; name: string; team: string; teamId: string; points: number }[];
   teams: { id: string; name: string; points: number }[];
   articles: Article[];
 };
@@ -38,6 +49,7 @@ type Store = {
   update: (patch: Partial<Prefs>) => void;
   season: Season;
   focus: { current: Event; last: Event };
+  loadResults: (event: Event) => void;
   ready: boolean;
   error: string;
 };
@@ -50,6 +62,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [ready, setReady] = useState(false),
     [error, setError] = useState("");
   const saveQueue = useRef(Promise.resolve());
+  const requested = useRef(new Set<string>());
+  // Résultats chargés à la demande, une fois par GP (la démo les a déjà tous).
+  const loadResults = (event: Event) => {
+    if (season.mode !== "live" || requested.current.has(event.id)) return;
+    if (Date.parse(event.sessions[0].startsAt) > Date.now()) return;
+    requested.current.add(event.id);
+    loadRound(event)
+      .then((more) => setSeason((x) => ({ ...x, results: { ...x.results, ...more } })))
+      .catch(() => requested.current.delete(event.id));
+  };
   useEffect(() => {
     let alive = true;
     Promise.all([
@@ -83,7 +105,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const focus = useMemo(() => focusEvents(season.events) as Store["focus"], [season]);
   const update = (patch: Partial<Prefs>) => setPrefs((p) => ({ ...p, ...patch }));
   return (
-    <Ctx.Provider value={{ prefs, setPrefs, update, season, focus, ready, error }}>
+    <Ctx.Provider value={{ prefs, setPrefs, update, season, focus, loadResults, ready, error }}>
       {children}
     </Ctx.Provider>
   );

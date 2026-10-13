@@ -1,6 +1,8 @@
 export const defaults = () => ({
   version: 2,
   favorites: ["driver-max_verstappen", "team-red_bull"],
+  myDriver: "",
+  myTeam: "",
   protectedSessions: [],
   frequency: "important",
   rumors: false,
@@ -21,6 +23,8 @@ export function restorePreferences(raw, sessions) {
       protectedSessions: Array.isArray(p.protectedSessions)
         ? p.protectedSessions.filter((x) => sessions.some((s) => s.id === x))
         : [],
+      myDriver: typeof p.myDriver === "string" ? p.myDriver : "",
+      myTeam: typeof p.myTeam === "string" ? p.myTeam : "",
       frequency: p.frequency === "all" ? "all" : "important",
       rumors: p.rumors === true,
       reminders: p.reminders === true,
@@ -85,4 +89,12 @@ export function focusEvents(events, now = Date.now()) {
     events.find((e) => raceStart(e) + 4 * 3600000 > now) ?? events.at(-1);
   const last = events.filter((e) => raceStart(e) <= now).at(-1) ?? current;
   return { current, last };
+}
+// Mon pilote / mon écurie : aussi ajoutés aux favoris, qui filtrent les actualités.
+export function setMine(prefs, key, id) {
+  return {
+    ...prefs,
+    [key]: id,
+    favorites: id && !prefs.favorites.includes(id) ? [...prefs.favorites, id] : prefs.favorites,
+  };
 }

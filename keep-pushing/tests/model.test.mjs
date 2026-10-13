@@ -12,6 +12,7 @@ import {
   protectWeekend,
   reminderPlan,
   focusEvents,
+  setMine,
 } from "../src/model.mjs";
 test("Une session protégée masque son article même dans toute la F1", () => {
   const p = setProtected(defaults(), RACE, true);
@@ -118,4 +119,13 @@ test("Week-end en cours et dernier week-end selon la date", () => {
   assert.equal(focusEvents(events, during).current.id, "b");
   assert.equal(focusEvents(events, Date.parse("2027-01-01")).current.id, "b");
   assert.equal(focusEvents(demoSeason.events, 0).last.id, "f1-demo-1");
+});
+test("Mon pilote et mon écurie : choisis, ajoutés aux favoris, restaurés", () => {
+  const p = setMine(setMine(defaults(), "myDriver", "driver-leclerc"), "myTeam", "team-ferrari");
+  assert.equal(p.myDriver, "driver-leclerc");
+  assert(p.favorites.includes("driver-leclerc") && p.favorites.includes("team-ferrari"));
+  assert.equal(setMine(p, "myDriver", "driver-leclerc").favorites.length, p.favorites.length);
+  const back = restorePreferences(JSON.stringify(p), sessions);
+  assert.equal(back.myTeam, "team-ferrari");
+  assert.equal(restorePreferences(JSON.stringify({ ...p, myDriver: 3 }), sessions).myDriver, "");
 });

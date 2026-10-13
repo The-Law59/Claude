@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { articleVisible } from "../../src/model.mjs";
@@ -6,13 +6,23 @@ import { useStore } from "../../src/store";
 import { Button, Pills, Screen, formatDate, s } from "../../src/ui";
 
 export default function Home() {
-  const { prefs, season, focus } = useStore();
+  const { prefs, season, focus, loadResults } = useStore();
+  useEffect(() => loadResults(focus.last), [focus.last.id]);
   const router = useRouter();
   const [personal, setPersonal] = useState(true);
   const { current, last } = focus;
   const next = current.sessions.find((x) => Date.parse(x.startsAt) > Date.now());
   const lastRaceProtected = prefs.protectedSessions.includes(last.sessions.at(-1)!.id);
   const visible = season.articles.filter((a) => articleVisible(a, prefs, personal));
+  const rank = <T extends { id: string }>(list: T[], id: string) => {
+    const i = list.findIndex((x) => x.id === id);
+    return i < 0 ? null : { ...list[i], position: i + 1 };
+  };
+  const myDriver = rank(season.drivers, prefs.myDriver);
+  const myTeam = rank(season.teams, prefs.myTeam);
+  const lastResult = season.results[last.sessions.at(-1)!.id]?.find(
+    (r) => r.driverId === prefs.myDriver,
+  );
   return (
     <Screen>
       <Text style={s.title}>Au cœur du paddock.</Text>
@@ -36,6 +46,43 @@ export default function Home() {
             {prefs.protectedSessions.length} session(s) protégée(s). Les actualités
             associées sont masquées.
           </Text>
+        </View>
+      )}
+      <Text style={s.heading}>Mon paddock</Text>
+      {!myDriver && !myTeam ? (
+        <View style={s.card}>
+          <Text style={s.text}>Choisissez votre pilote et votre écurie pour les suivre ici.</Text>
+          <Button label="Choisir ★" onPress={() => router.navigate("/favorites")} secondary />
+        </View>
+      ) : prefs.protectedSessions.length > 0 ? (
+        <View style={s.lock}>
+          <Text style={s.text}>Classement masqué : une session est protégée.</Text>
+        </View>
+      ) : (
+        <View style={s.card}>
+          {myDriver && (
+            <View style={s.rank}>
+              <Text style={s.position}>{myDriver.position}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.cardTitle}>{myDriver.name} ★</Text>
+                <Text style={s.small}>
+                  {myDriver.team}
+                  {lastResult ? ` · ${lastResult.position}e à ${last.name}` : ""}
+                </Text>
+              </View>
+              <Text style={s.time}>{myDriver.points} pts</Text>
+            </View>
+          )}
+          {myTeam && (
+            <View style={s.rank}>
+              <Text style={s.position}>{myTeam.position}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.cardTitle}>{myTeam.name} ★</Text>
+                <Text style={s.small}>Championnat des écuries</Text>
+              </View>
+              <Text style={s.time}>{myTeam.points} pts</Text>
+            </View>
+          )}
         </View>
       )}
       <Pills

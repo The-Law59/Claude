@@ -27,12 +27,13 @@ Les rappels locaux sont réservés au téléphone.
 - Actualités F1 en français depuis le flux RSS public de [Motorsport.com](https://fr.motorsport.com/rss/) : titre, extrait et lien vers l’article d’origine. Les favoris sont reconnus dans le texte (nom du pilote, de l’écurie). Ajouter une source : une ligne dans `src/news.mjs`. Dans le navigateur (`npm run web`), le flux peut être bloqué par la politique CORS du site ; l’app mobile n’est pas concernée.
 - Anti-spoil des actualités, règle prudente : un article publié après le début d’une session protégée est masqué, quel que soit son sujet.
 - Anti-spoil par session ou par week-end, pour le dernier et le prochain Grand Prix. Articles liés et résultats masqués ; classements masqués dès qu’une session est protégée.
-- Favoris (liste des pilotes et écuries de la saison) et réglages enregistrés sur l’appareil, sans compte.
+- Saison complète : calendrier des Grands Prix avec vainqueur, page de chaque GP avec course, sprint et qualifications (chargés à la demande), protection anti-spoil par GP.
+- Mon pilote et mon écurie (★) : carte « Mon paddock » sur l’accueil (classement, points, dernier résultat), mis en avant dans les classements. Autres favoris pour filtrer les actualités. Réglages enregistrés sur l’appareil, sans compte.
 - Rappels locaux neutres à 10, 30 ou 60 minutes pour les sessions du prochain Grand Prix.
 
 ## Architecture
 
-- `app/` : écrans (expo-router). `(tabs)/` contient Accueil, Course, Saison, Favoris, Réglages ; `article/[id].tsx` le détail d’un article. Le bouton retour Android et les liens `keeppushing://` fonctionnent.
+- `app/` : écrans (expo-router). `(tabs)/` contient Accueil, Course, Saison, Favoris, Réglages ; `article/[id].tsx` le détail d’un article ; `gp/[id].tsx` un Grand Prix. Le bouton retour Android et les liens `keeppushing://` fonctionnent.
 - `src/store.tsx` : préférences et saison partagées entre les écrans.
 - `src/ui.tsx` : thème, composants communs (en-tête, boutons, interrupteurs, classements).
 - `src/model.mjs` : règles anti-spoil, rappels, choix du week-end en cours. Testables sans téléphone.

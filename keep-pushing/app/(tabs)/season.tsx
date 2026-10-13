@@ -2,17 +2,13 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useStore } from "../../src/store";
-import { Button, Pills, ResultRows, Screen, formatDate, s } from "../../src/ui";
+import { Button, Pills, Screen, formatDate, s } from "../../src/ui";
 
 export default function Season() {
   const { prefs, season, focus } = useStore();
   const router = useRouter();
-  const events = [...new Set([focus.last, focus.current])];
-  const [eventId, setEventId] = useState(focus.last.id);
-  const event = events.find((e) => e.id === eventId) ?? focus.current;
-  const [sessionId, setSessionId] = useState(event.sessions.at(-1)!.id);
-  const session = event.sessions.find((x) => x.id === sessionId) ?? event.sessions.at(-1)!;
-  const [tab, setTab] = useState<"sessions" | "drivers" | "teams">("sessions");
+  const [tab, setTab] = useState<"calendar" | "drivers" | "teams">("calendar");
+  const mine = tab === "drivers" ? prefs.myDriver : prefs.myTeam;
   const standings: { id: string; name: string; points: number; team?: string }[] =
     tab === "drivers" ? season.drivers : season.teams;
   return (
@@ -20,50 +16,43 @@ export default function Season() {
       <Text style={s.title}>La saison.</Text>
       <Pills
         options={[
-          ["sessions", "Sessions"],
+          ["calendar", "Calendrier"],
           ["drivers", "Pilotes"],
           ["teams", "Écuries"],
         ]}
         value={tab}
         onChange={setTab}
       />
-      {tab === "sessions" ? (
+      {tab === "calendar" ? (
         <>
-          {events.length > 1 && (
-            <Pills
-              options={[
-                [focus.last.id, "Dernier GP"],
-                [focus.current.id, "Prochain GP"],
-              ]}
-              value={event.id}
-              onChange={setEventId}
-            />
-          )}
-          <Text style={s.heading}>{event.name}</Text>
-          <Text style={s.small}>Horaires locaux du téléphone</Text>
-          {event.sessions.map((x) => (
-            <View style={s.session} key={x.id}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.text}>{x.label}</Text>
-                <Text style={s.small}>{formatDate(x.startsAt)}</Text>
-              </View>
+          <Text style={s.small}>
+            {season.events.length} Grands Prix · touchez un GP pour ses résultats
+          </Text>
+          {season.events.map((e) => {
+            const race = e.sessions.at(-1)!;
+            const hidden = e.sessions.some((x) => prefs.protectedSessions.includes(x.id));
+            const upcoming = Date.parse(race.startsAt) > Date.now();
+            return (
               <Pressable
+                key={e.id}
                 accessibilityRole="button"
-                onPress={() => setSessionId(x.id)}
-                style={s.smallButton}
+                onPress={() => router.push(`/gp/${e.id}`)}
+                style={[s.session, e.id === focus.current.id && s.mine]}
               >
+                <Text style={s.position}>{e.round}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.text}>{e.name}</Text>
+                  <Text style={s.small}>
+                    {formatDate(race.startsAt)}
+                    {!upcoming && e.winner && !hidden ? ` · 🏆 ${e.winner.name}` : ""}
+                  </Text>
+                </View>
                 <Text style={s.link}>
-                  {prefs.protectedSessions.includes(x.id)
-                    ? "Protégée"
-                    : Date.parse(x.startsAt) > Date.now()
-                      ? "À venir"
-                      : "Résultat"}
+                  {hidden ? "Protégé" : upcoming ? "À venir" : "Résultats →"}
                 </Text>
               </Pressable>
-            </View>
-          ))}
-          <Text style={s.heading}>{session.label}</Text>
-          <ResultRows sessionId={session.id} />
+            );
+          })}
         </>
       ) : prefs.protectedSessions.length > 0 ? (
         <View style={s.lock}>
@@ -81,10 +70,13 @@ export default function Season() {
             {season.mode === "live" ? "CHAMPIONNAT" : "POINTS FICTIFS"}
           </Text>
           {standings.map((x, i) => (
-            <View key={x.id} style={s.rank}>
+            <View key={x.id} style={[s.rank, x.id === mine && s.mine]}>
               <Text style={s.position}>{i + 1}</Text>
               <View style={{ flex: 1 }}>
-                <Text style={s.text}>{x.name}</Text>
+                <Text style={s.text}>
+                  {x.name}
+                  {x.id === mine ? " ★" : ""}
+                </Text>
                 {!!x.team && <Text style={s.small}>{x.team}</Text>}
               </View>
               <Text style={s.time}>{x.points} pts</Text>
