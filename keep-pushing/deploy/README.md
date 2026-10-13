@@ -18,7 +18,7 @@ La version web tourne dans un petit conteneur LXC. Les actualités passent par
 
 ```bash
 apt-get update && apt-get install -y curl
-curl -fsSL https://raw.githubusercontent.com/The-Law59/Claude/claude/install-ponytail-graphify-agent-omniroute-9y9wyo/keep-pushing/deploy/install-lxc.sh | bash
+curl -fsSL https://raw.githubusercontent.com/The-Law59/Claude/keep-pushing/keep-pushing/deploy/install-lxc.sh | bash
 ```
 
 Le script installe Docker, télécharge le projet dans `/opt/keep-pushing`,
