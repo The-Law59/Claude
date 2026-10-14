@@ -189,6 +189,7 @@ export function SourceBadge({
 export function ResultRows({ sessionId }: { sessionId: string }) {
   const { c, s } = useTheme();
   const { prefs, setPrefs, season } = useStore();
+  const router = useRouter();
   if (prefs.protectedSessions.includes(sessionId))
     return (
       <View style={s.lock}>
@@ -196,7 +197,12 @@ export function ResultRows({ sessionId }: { sessionId: string }) {
         <Text style={s.text}>Regardez-la à votre rythme. Son résultat reste masqué.</Text>
         <Button
           label="J’ai regardé cette session"
-          onPress={() => setPrefs((p) => setProtected(p, sessionId, false))}
+          onPress={() =>
+            // Course et sprint : révélation du podium ; autres sessions : déblocage direct.
+            /:(Race|Sprint)$/.test(sessionId)
+              ? router.push(`/reveal/${encodeURIComponent(sessionId)}`)
+              : setPrefs((p) => setProtected(p, sessionId, false))
+          }
           secondary
         />
       </View>

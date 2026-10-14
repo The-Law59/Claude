@@ -27,6 +27,20 @@ export default function Settings() {
     <Screen>
       <Text style={s.title}>À votre rythme.</Text>
       <Text style={s.heading}>Anti-spoil</Text>
+      <Text style={s.text}>Protection automatique</Text>
+      <Pills
+        options={[
+          ["off", "Désactivée"],
+          ["race", "Courses et sprints"],
+          ["weekend", "Tout le week-end"],
+        ]}
+        value={prefs.autoProtect}
+        onChange={(autoProtect) => update({ autoProtect })}
+      />
+      <Text style={s.small}>
+        Les sessions choisies se protègent seules 5 minutes avant le départ (jusqu’à 48 h
+        après). Une session marquée « regardée » reste visible.
+      </Text>
       {[...new Set([focus.last, focus.current])].map((event) => (
         <View key={event.id}>
           <Text style={s.label}>{event.name.toUpperCase()}</Text>

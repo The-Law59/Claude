@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { demoSeason } from "./data.mjs";
 import { loadRound, loadSeason } from "./jolpica.mjs";
 import { loadNews, toArticle } from "./news.mjs";
-import { defaults, focusEvents, restorePreferences } from "./model.mjs";
+import { autoProtect, defaults, focusEvents, restorePreferences } from "./model.mjs";
 
 const KEY = "keep-pushing.preferences.v1";
 export type Prefs = {
@@ -12,6 +12,8 @@ export type Prefs = {
   myDriver: string;
   myTeam: string;
   protectedSessions: string[];
+  revealed: string[];
+  autoProtect: "off" | "race" | "weekend";
   frequency: string;
   rumors: boolean;
   reminders: boolean;
@@ -108,6 +110,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       .then(() => AsyncStorage.setItem(KEY, JSON.stringify(prefs)))
       .catch(() => setError("Vos choix n’ont pas pu être enregistrés."));
   }, [prefs, ready]);
+  // Anti-spoil automatique : au démarrage puis chaque minute.
+  useEffect(() => {
+    if (!ready) return;
+    const tick = () => setPrefs((p) => autoProtect(p, season.events) as Prefs);
+    tick();
+    const timer = setInterval(tick, 60000);
+    return () => clearInterval(timer);
+  }, [ready, season.events]);
   const focus = useMemo(() => focusEvents(season.events) as Store["focus"], [season]);
   const update = (patch: Partial<Prefs>) => setPrefs((p) => ({ ...p, ...patch }));
   return (

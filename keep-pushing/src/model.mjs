@@ -4,6 +4,8 @@ export const defaults = () => ({
   myDriver: "",
   myTeam: "",
   protectedSessions: [],
+  revealed: [], // sessions marquées « vues » : l'anti-spoil auto ne les reprotège pas
+  autoProtect: "off", // "off" | "race" | "weekend"
   frequency: "important",
   rumors: false,
   reminders: false,
@@ -23,6 +25,10 @@ export function restorePreferences(raw, sessions) {
       protectedSessions: Array.isArray(p.protectedSessions)
         ? p.protectedSessions.filter((x) => sessions.some((s) => s.id === x))
         : [],
+      revealed: Array.isArray(p.revealed)
+        ? p.revealed.filter((x) => sessions.some((s) => s.id === x))
+        : [],
+      autoProtect: ["race", "weekend"].includes(p.autoProtect) ? p.autoProtect : "off",
       myDriver: typeof p.myDriver === "string" ? p.myDriver : "",
       myTeam: typeof p.myTeam === "string" ? p.myTeam : "",
       frequency: p.frequency === "all" ? "all" : "important",
@@ -53,23 +59,37 @@ export function notificationAllowed(event, prefs) {
     (prefs.frequency === "all" || event.important)
   );
 }
-export function setProtected(prefs, id, value) {
-  return {
-    ...prefs,
-    protectedSessions: value
-      ? [...new Set([...prefs.protectedSessions, id])]
-      : prefs.protectedSessions.filter((x) => x !== id),
-  };
-}
-// N'ajoute ou ne retire que les sessions de ce week-end.
-export function protectWeekend(prefs, sessions, value) {
-  const ids = sessions.map((s) => s.id);
+// Débloquer une session la marque « vue » ; la reprotéger efface cette marque.
+function protectIds(prefs, ids, value) {
+  const without = (list) => list.filter((x) => !ids.includes(x));
   return {
     ...prefs,
     protectedSessions: value
       ? [...new Set([...prefs.protectedSessions, ...ids])]
-      : prefs.protectedSessions.filter((x) => !ids.includes(x)),
+      : without(prefs.protectedSessions),
+    revealed: value ? without(prefs.revealed ?? []) : [...new Set([...(prefs.revealed ?? []), ...ids])],
   };
+}
+export const setProtected = (prefs, id, value) => protectIds(prefs, [id], value);
+// N'ajoute ou ne retire que les sessions de ce week-end.
+export const protectWeekend = (prefs, sessions, value) =>
+  protectIds(prefs, sessions.map((s) => s.id), value);
+
+// Anti-spoil automatique : protège les sessions choisies dès 5 min avant leur
+// départ et jusqu'à 48 h après, sauf celles déjà marquées « vues ».
+const AUTO_TYPES = { race: ["Race", "Sprint"] };
+export function autoProtect(prefs, events, now = Date.now()) {
+  if (prefs.autoProtect === "off" || !prefs.autoProtect) return prefs;
+  const ids = events
+    .flatMap((e) => e.sessions)
+    .filter((s) => prefs.autoProtect === "weekend" || AUTO_TYPES.race.includes(s.type))
+    .filter((s) => {
+      const start = Date.parse(s.startsAt);
+      return now >= start - 5 * 60000 && now <= start + 48 * 3600000;
+    })
+    .map((s) => s.id)
+    .filter((id) => !prefs.protectedSessions.includes(id) && !(prefs.revealed ?? []).includes(id));
+  return ids.length ? { ...prefs, protectedSessions: [...prefs.protectedSessions, ...ids] } : prefs;
 }
 export function reminderPlan(sessions, prefs, now = Date.now(), name = "") {
   if (!prefs.reminders) return [];

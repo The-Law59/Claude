@@ -129,3 +129,36 @@ test("Mon pilote et mon écurie : choisis, ajoutés aux favoris, restaurés", ()
   assert.equal(back.myTeam, "team-ferrari");
   assert.equal(restorePreferences(JSON.stringify({ ...p, myDriver: 3 }), sessions).myDriver, "");
 });
+
+import { autoProtect } from "../src/model.mjs";
+
+test("Anti-spoil automatique : courses protégées 5 min avant, jamais une session déjà vue", () => {
+  const raceStart = Date.parse(sessions.at(-1).startsAt);
+  const quali = sessions.at(-2);
+  const on = { ...defaults(), autoProtect: "race" };
+  const events = demoSeason.events;
+  // Trop tôt : rien ; 4 min avant : la course est protégée, pas les qualifs.
+  assert.equal(autoProtect(on, events, raceStart - 10 * 60000), on);
+  const p = autoProtect(on, events, raceStart - 4 * 60000);
+  assert.deepEqual(p.protectedSessions, [RACE]);
+  // Débloquée par l'utilisateur : reste visible, même au rafraîchissement suivant.
+  const seen = setProtected(p, RACE, false);
+  assert.deepEqual(autoProtect(seen, events, raceStart + 3600000).protectedSessions, []);
+  // Plus de 48 h après : on ne protège plus.
+  assert.deepEqual(autoProtect(on, events, raceStart + 49 * 3600000).protectedSessions, []);
+  // Mode week-end : les qualifications aussi.
+  const all = autoProtect({ ...on, autoProtect: "weekend" }, events, Date.parse(quali.startsAt));
+  assert(all.protectedSessions.includes(QUALI));
+  const off = defaults(); // désactivé par défaut : préférences inchangées
+  assert.equal(autoProtect(off, events, raceStart), off);
+});
+
+test("Reprotéger une session efface sa marque « vue »", () => {
+  const seen = setProtected(defaults(), RACE, false);
+  assert.deepEqual(seen.revealed, [RACE]);
+  assert.deepEqual(setProtected(seen, RACE, true).revealed, []);
+  const back = restorePreferences(JSON.stringify({ ...seen, autoProtect: "weekend" }), sessions);
+  assert.deepEqual(back.revealed, [RACE]);
+  assert.equal(back.autoProtect, "weekend");
+  assert.equal(restorePreferences(JSON.stringify({ ...seen, autoProtect: "x" }), sessions).autoProtect, "off");
+});

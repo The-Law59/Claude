@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { articleVisible } from "../../src/model.mjs";
+import { articleVisible, protectWeekend } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
 import { Button, Pills, Screen, SourceBadge, formatDate, useTheme } from "../../src/ui";
 
 export default function Home() {
   const { s } = useTheme();
-  const { prefs, season, focus, loadResults } = useStore();
+  const { prefs, setPrefs, season, focus, loadResults } = useStore();
   useEffect(() => loadResults(focus.last), [focus.last.id]);
   const router = useRouter();
   const [personal, setPersonal] = useState(true);
@@ -43,6 +43,15 @@ export default function Home() {
           label={lastRaceProtected ? "Gérer la protection" : "Voir la dernière course →"}
           onPress={() => router.navigate(lastRaceProtected ? "/settings" : "/live")}
         />
+        {current.sessions.every((x) => prefs.protectedSessions.includes(x.id)) ? (
+          <Text style={s.heroText}>🎬 Week-end en différé : rien ne sera dévoilé.</Text>
+        ) : (
+          <Button
+            label="🎬 Je regarde ce week-end en différé"
+            onPress={() => setPrefs((p) => protectWeekend(p, current.sessions, true))}
+            secondary
+          />
+        )}
       </View>
       {prefs.protectedSessions.length > 0 && (
         <View style={s.lock}>
