@@ -127,3 +127,31 @@ export async function loadRound(event, fetchFn = fetch) {
   ]);
   return parseRound(event, { race, qualifying, sprint });
 }
+
+// Saison d'un pilote, GP par GP : place en course (dnf si non classé) et en qualifs.
+export function parseDriverSeason(results, qualifying) {
+  const rounds = {};
+  for (const r of results.RaceTable.Races) {
+    const x = r.Results[0];
+    rounds[r.round] = {
+      round: Number(r.round),
+      name: r.raceName,
+      race: Number(x.position),
+      dnf: !/^\d+$/.test(x.positionText),
+      points: Number(x.points),
+    };
+  }
+  for (const q of qualifying.RaceTable.Races) {
+    rounds[q.round] ??= { round: Number(q.round), name: q.raceName };
+    rounds[q.round].quali = Number(q.QualifyingResults[0].position);
+  }
+  return Object.values(rounds).sort((a, b) => a.round - b.round);
+}
+
+export async function loadDriverSeason(driverId, fetchFn = fetch) {
+  const id = driverId.replace(/^driver-/, "");
+  const [results, qualifying] = await Promise.all(
+    ["results", "qualifying"].map((kind) => getJson(fetchFn, `/current/drivers/${id}/${kind}.json?limit=100`)),
+  );
+  return parseDriverSeason(results, qualifying);
+}

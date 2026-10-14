@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { articleVisible, protectWeekend } from "../../src/model.mjs";
+import { articleVisible, protectWeekend, teammateOf } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
-import { RecapCard } from "../../src/components/RecapCard";
 import { Button, Pills, Screen, SourceBadge, formatDate, useTheme } from "../../src/ui";
 
 export default function Home() {
@@ -62,7 +61,6 @@ export default function Home() {
           </Text>
         </View>
       )}
-      <RecapCard event={last} />
       <Text style={s.heading}>Mon paddock</Text>
       {!myDriver && !myTeam ? (
         <View style={s.card}>
@@ -87,6 +85,13 @@ export default function Home() {
               </View>
               <Text style={s.time}>{myDriver.points} pts</Text>
             </View>
+          )}
+          {myDriver && (
+            <Button
+              label={`⚔ Duel face à ${teammateOf(season.drivers, myDriver.id)?.name ?? "son coéquipier"} →`}
+              onPress={() => router.push("/duel")}
+              secondary
+            />
           )}
           {myTeam && (
             <View style={s.rank}>

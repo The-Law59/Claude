@@ -162,3 +162,39 @@ test("Reprotéger une session efface sa marque « vue »", () => {
   assert.equal(back.autoProtect, "weekend");
   assert.equal(restorePreferences(JSON.stringify({ ...seen, autoProtect: "x" }), sessions).autoProtect, "off");
 });
+
+import { duel, teammateOf } from "../src/model.mjs";
+import { parseDriverSeason } from "../src/jolpica.mjs";
+
+test("Duel coéquipiers : course, qualifs, meilleur résultat, points", () => {
+  const drivers = [
+    { id: "driver-a", teamId: "team-x", points: 200 },
+    { id: "driver-b", teamId: "team-x", points: 180 },
+    { id: "driver-c", teamId: "team-x", points: 4 }, // remplaçant ponctuel
+    { id: "driver-d", teamId: "team-y", points: 250 },
+  ];
+  assert.equal(teammateOf(drivers, "driver-a").id, "driver-b");
+  assert.equal(teammateOf(drivers, "driver-b").id, "driver-a");
+  assert.equal(teammateOf(drivers, "inconnu"), undefined);
+  const r = (round, race, quali, points, dnf = false) => ({ round, name: `GP${round}`, race, quali, points, dnf });
+  const d = duel(
+    [r(1, 1, 2, 25), r(2, 15, 1, 0, true), r(3, 3, 3, 15)],
+    [r(1, 2, 1, 18), r(2, 4, 5, 12), r(4, 1, 1, 25)], // GP4 sans moi : ignoré
+  );
+  assert.deepEqual(d.race, [1, 1]); // GP1 devant, GP2 abandon
+  assert.deepEqual(d.quali, [1, 1]);
+  // Meilleur résultat : sur toute la saison de chacun ; un abandon ne compte pas.
+  assert.deepEqual(d.best, [1, 1]);
+  assert.deepEqual(duel([r(1, 9, 9, 2, true)], [r(1, 3, 3, 15)]).best, [Infinity, 3]);
+  assert.equal(d.rounds.length, 2);
+});
+
+test("Saison d'un pilote au format Jolpica, abandon repéré", () => {
+  const races = (key, rows) => ({ RaceTable: { Races: rows.map(([round, x]) => ({ round, raceName: `GP${round}`, [key]: [x] })) } });
+  const season = parseDriverSeason(
+    races("Results", [["1", { position: "3", positionText: "3", points: "15" }], ["2", { position: "18", positionText: "R", points: "0" }]]),
+    races("QualifyingResults", [["1", { position: "4" }], ["2", { position: "2" }]]),
+  );
+  assert.deepEqual(season[0], { round: 1, name: "GP1", race: 3, dnf: false, points: 15, quali: 4 });
+  assert.equal(season[1].dnf, true);
+});

@@ -131,5 +131,32 @@ export function lockTime(event) {
   );
   return Date.parse((quali[0] ?? event.sessions.at(-1)).startsAt);
 }
-// Récap disponible 3 h après le départ de la course (résultats publiés).
-export const recapReadyAt = (event) => Date.parse(event.sessions.at(-1).startsAt) + 3 * 3600000;
+// Résultats d'un GP considérés publiés 3 h après le départ de la course.
+export const resultsReadyAt = (event) => Date.parse(event.sessions.at(-1).startsAt) + 3 * 3600000;
+// Coéquipier : même écurie, celui qui a le plus de points (changements de baquet).
+export const teammateOf = (drivers, driverId) => {
+  const me = drivers.find((d) => d.id === driverId);
+  return drivers
+    .filter((d) => d.id !== driverId && me && d.teamId === me.teamId)
+    .sort((a, b) => b.points - a.points)[0];
+};
+
+// Duel : face-à-face GP par GP sur les week-ends courus par les deux ;
+// meilleur résultat sur toute la saison de chacun (points : classement officiel).
+export function duel(mine, mate) {
+  const byRound = new Map(mate.map((r) => [r.round, r]));
+  const rounds = mine
+    .filter((r) => byRound.has(r.round))
+    .map((r) => ({ round: r.round, name: r.name, me: r, mate: byRound.get(r.round) }));
+  const ahead = (key) => {
+    const both = rounds.filter((r) => r.me[key] && r.mate[key]);
+    return [both.filter((r) => r.me[key] < r.mate[key]).length, both.filter((r) => r.mate[key] < r.me[key]).length];
+  };
+  const best = (list) => Math.min(...list.filter((r) => r.race && !r.dnf).map((r) => r.race));
+  return {
+    rounds,
+    race: ahead("race"),
+    quali: ahead("quali"),
+    best: [best(mine), best(mate)],
+  };
+}

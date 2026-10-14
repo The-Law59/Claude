@@ -1,6 +1,6 @@
 // Appels au serveur Keep Pushing : même origine dans le navigateur, ou
 // EXPO_PUBLIC_API_URL sur mobile. Sans serveur, les fonctions qui en
-// dépendent (traduction, récap, pronostics) sont masquées.
+// dépendent (traduction, pronostics) sont masquées.
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
 export const hasApi = () => typeof document !== "undefined" || !!API_URL;
 
