@@ -3,7 +3,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 
-const MODEL = "claude-opus-5-5";
+const MODEL = "claude-haiku-5-5";
 const BATCH = 20;
 const SYSTEM = `Tu traduis des actualités de Formule 1 de l'anglais vers le français, pour une application destinée au public français.
 - Traduis fidèlement le titre et le résumé : ne résume pas, n'ajoute rien, ne commente pas.
@@ -46,12 +46,10 @@ export async function createTranslator({ client, cacheFile, log = console.warn }
 
   async function translateBatch(batch) {
     const input = batch.map((x, i) => ({ id: String(i), title: x.title, summary: x.summary }));
-    const res = await client.beta.messages.create({
+    // Haiku n'a pas de repli automatique : en cas de refus, l'article reste en anglais.
+    const res = await client.messages.create({
       model: MODEL,
       max_tokens: 16000,
-      // Si le modèle refuse, l'API relance la requête sur le modèle de repli recommandé.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
       output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
       system: SYSTEM,
       messages: [{ role: "user", content: JSON.stringify(input) }],
