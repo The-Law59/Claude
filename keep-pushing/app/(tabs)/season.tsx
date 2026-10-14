@@ -67,11 +67,17 @@ export default function Season() {
         </View>
       ) : (
         <View style={s.card}>
-          <Text style={s.label}>
-            {season.mode === "live" ? "CHAMPIONNAT" : "POINTS FICTIFS"}
-          </Text>
+          <Text style={s.label}>{season.mode === "live" ? "CHAMPIONNAT" : "POINTS FICTIFS"}</Text>
           {standings.map((x, i) => (
-            <View key={x.id} style={[s.rank, x.id === mine && s.mine]}>
+            <Pressable
+              key={x.id}
+              accessibilityRole="link"
+              onPress={() =>
+                season.mode === "live" &&
+                router.push(tab === "drivers" ? `/driver/${x.id}` : `/team/${x.id}`)
+              }
+              style={[s.rank, x.id === mine && s.mine]}
+            >
               <Text style={s.position}>{i + 1}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={s.text}>
@@ -80,11 +86,22 @@ export default function Season() {
                 </Text>
                 {!!x.team && <Text style={s.small}>{x.team}</Text>}
               </View>
-              <Text style={s.time}>{x.points} pts</Text>
-            </View>
+              <Text style={s.time}>{x.points} pts ›</Text>
+            </Pressable>
           ))}
           {season.mode === "live" && (
-            <Button label="⚔ Comparer deux pilotes" secondary onPress={() => router.push("/duel")} />
+            <Button
+              label="⚔ Comparer deux pilotes"
+              secondary
+              onPress={() => router.push("/duel")}
+            />
+          )}
+          {season.mode === "live" && (
+            <Button
+              label="🏆 Simulateur de championnat"
+              secondary
+              onPress={() => router.push("/simulator")}
+            />
           )}
         </View>
       )}

@@ -3,12 +3,28 @@ import { Pressable, Text, TextInput, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { api, hasApi } from "../../src/api.mjs";
 import { PARTS, POINTS } from "../../src/bets.mjs";
-import { accentFor } from "../../src/teams.mjs";
 import { useStore } from "../../src/store";
-import { Button, DriverPicker, Pills, Screen, formatDate, useTheme } from "../../src/ui";
+import {
+  Button,
+  DriverPicker,
+  Pills,
+  Screen,
+  Toggle,
+  formatDate,
+  ordinal,
+  useTheme,
+} from "../../src/ui";
 
 type Part = keyof typeof PARTS;
-type Bet = { quali?: string[]; sprint?: string[]; race?: string[]; fastest?: string; dnf?: number };
+type Bet = {
+  quali?: string[];
+  sprint?: string[];
+  race?: string[];
+  fastest?: string;
+  dnf?: number;
+  answer?: boolean;
+  joker?: boolean;
+};
 type PartScore = { slots: number[]; bonus: number; total: number } | null;
 type BetView = {
   eventId: string;
@@ -16,8 +32,16 @@ type BetView = {
   closes: Record<string, number>;
   mine: Bet | null;
   score:
-    | (Record<Part, PartScore> & { fastest: number | null; dnf: number | null; total: number })
+    | (Record<Part, PartScore> & {
+        fastest: number | null;
+        dnf: number | null;
+        answer: number | null;
+        joker: boolean;
+        total: number;
+      })
     | null;
+  question: { id: string; text: string; answer: boolean | null };
+  jokerOn: string | null;
   results: Partial<Record<"Qualifying" | "Sprint" | "Race", string[]>> & {
     fastest: string | null;
     dnf: number | null;
@@ -25,6 +49,22 @@ type BetView = {
   friends: { pseudo: string; bet: Bet; score: number }[];
 };
 type Rank = { rank: number; pseudo: string; points: number; weekends: number; me: boolean };
+type League = { id: string; name: string; code: string; rows: Rank[] };
+type Round = {
+  eventId: string;
+  name: string;
+  points: number | null;
+  best: { pseudo: string; points: number };
+  total: number;
+  rank: number;
+};
+type Boards = {
+  general: Rank[];
+  friends: Rank[];
+  players: number;
+  leagues: League[];
+  history: Round[];
+};
 type Person = { id: string; pseudo: string };
 type Friends = { me: Person; friends: Person[]; incoming: Person[]; outgoing: Person[] };
 
@@ -95,7 +135,7 @@ export default function Pronos() {
 }
 
 function Weekend() {
-  const { s, c } = useTheme();
+  const { s, c, team } = useTheme();
   const { season, prefs } = useStore();
   const call = useCall();
   const events = season.events;
@@ -129,8 +169,7 @@ function Weekend() {
       .find((d) => d.id === id)
       ?.name.split(" ")
       .at(-1) ?? "—";
-  const teamColor = (id?: string) =>
-    accentFor(season.drivers.find((d) => d.id === id)?.teamId ?? "");
+  const teamColor = (id?: string) => team(season.drivers.find((d) => d.id === id)?.teamId ?? "");
   const open = (part: string) => !!view && Date.now() < view.closes[part];
   // Résultats masqués tant que la session est protégée par l'anti-spoil.
   const shown = (session: string) => !prefs.protectedSessions.includes(`${event.id}:${session}`);
@@ -163,7 +202,9 @@ function Weekend() {
     if (open("fastest")) {
       body.fastest = draft.fastest ?? null;
       body.dnf = draft.dnf ?? null;
+      body.answer = draft.answer ?? null;
     }
+    if (open("joker")) body.joker = !!draft.joker;
     try {
       const v: BetView = await call(`/api/bets/${event.id}`, { method: "PUT", body });
       setView(v);
@@ -176,7 +217,7 @@ function Weekend() {
   };
 
   const parts = (view?.parts ?? []).slice().sort((a, b) => view!.closes[a] - view!.closes[b]);
-  const anyOpen = parts.some(open) || open("fastest");
+  const anyOpen = parts.some(open) || open("fastest") || open("joker");
   const sc = view?.score;
   return (
     <>
@@ -204,6 +245,7 @@ function Weekend() {
           {sc && sc.total > 0 && shown("Race") && (
             <Text style={s.heading}>
               Total du week-end : <Text style={{ color: c.accent }}>{sc.total} pts</Text>
+              {sc.joker ? "  (joker ×2)" : ""}
             </Text>
           )}
           {parts.map((part) => {
@@ -305,13 +347,61 @@ function Weekend() {
             )}
           </View>
 
+          <View style={s.card}>
+            <Text style={s.label}>
+              QUESTION DU WEEK-END · {POINTS.question} PTS
+              {shown("Race") && sc?.answer !== null && sc?.answer !== undefined
+                ? `  ·  +${sc.answer}`
+                : ""}
+            </Text>
+            <Text style={s.text}>{view.question.text}</Text>
+            {open("answer") ? (
+              <Pills
+                options={[
+                  ["yes", "Oui"],
+                  ["no", "Non"],
+                ]}
+                value={draft.answer === undefined ? "" : draft.answer ? "yes" : "no"}
+                onChange={(v) => setDraft({ ...draft, answer: v === "yes" })}
+              />
+            ) : (
+              <Text style={s.small}>
+                Votre réponse : {draft.answer === undefined ? "—" : draft.answer ? "Oui" : "Non"}
+                {shown("Race") && view.question.answer !== null
+                  ? ` · bonne réponse : ${view.question.answer ? "Oui" : "Non"}`
+                  : ""}
+              </Text>
+            )}
+          </View>
+
+          <View style={[s.card, draft.joker && { borderWidth: 2, borderColor: c.accent }]}>
+            <Text style={s.label}>JOKER · POINTS ×2</Text>
+            <Text style={s.small}>
+              Un seul par saison : tous les points de ce week-end comptent double. À poser avant la
+              première session pariée.
+            </Text>
+            {view.jokerOn ? (
+              <Text style={s.text}>Joker déjà posé sur {view.jokerOn}.</Text>
+            ) : open("joker") ? (
+              <Toggle
+                label="Poser mon joker sur ce Grand Prix"
+                value={!!draft.joker}
+                onChange={(joker) => setDraft({ ...draft, joker })}
+              />
+            ) : (
+              <Text style={s.text}>
+                {draft.joker ? "Joker posé sur ce Grand Prix." : "Pas de joker sur ce Grand Prix."}
+              </Text>
+            )}
+          </View>
+
           {anyOpen && <Button label="Enregistrer mes paris" onPress={save} />}
           {!!notice && <Text style={s.small}>{notice}</Text>}
           <Text style={s.small}>
             Barème par case : place exacte {POINTS.exact} pts · à une place près {POINTS.close} pts
             · dans le top mais mal placé {POINTS.inTop} pts · sans-faute +{POINTS.perfect}. Meilleur
             tour {POINTS.fastest} pts. Abandons : exact {POINTS.dnfExact} pts, à 1 près{" "}
-            {POINTS.dnfClose} pts.
+            {POINTS.dnfClose} pts. Question {POINTS.question} pts. Joker : total ×2.
           </Text>
 
           {view.friends.length > 0 && (
@@ -335,6 +425,10 @@ function Weekend() {
                     <Text style={s.small}>Meilleur tour : {name(f.bet.fastest)}</Text>
                   )}
                   {f.bet.dnf !== undefined && <Text style={s.small}>Abandons : {f.bet.dnf}</Text>}
+                  {f.bet.answer !== undefined && (
+                    <Text style={s.small}>Question : {f.bet.answer ? "Oui" : "Non"}</Text>
+                  )}
+                  {f.bet.joker && <Text style={s.small}>🃏 Joker posé</Text>}
                   {!parts.some((p) => f.bet[p]) && f.bet.fastest === undefined && (
                     <Text style={s.small}>Paris encore secrets.</Text>
                   )}
@@ -349,52 +443,186 @@ function Weekend() {
 }
 
 function Rankings() {
-  const { s } = useTheme();
+  const { s, c } = useTheme();
   const { prefs } = useStore();
   const call = useCall();
-  const [scope, setScope] = useState<"general" | "friends">("general");
-  const [data, setData] = useState<{ general: Rank[]; friends: Rank[]; players: number } | null>(
-    null,
-  );
+  const [scope, setScope] = useState("general");
+  const [data, setData] = useState<Boards | null>(null);
   const [error, setError] = useState("");
-  useFocusEffect(
-    useCallback(() => {
-      call("/api/leaderboard")
-        .then(setData)
-        .catch((e) => setError(e.message));
-    }, [call]),
-  );
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const run = (p: Promise<Boards>) =>
+    p
+      .then((d) => {
+        setData(d);
+        setError("");
+        return d;
+      })
+      .catch((e) => {
+        setError(e.message);
+        return null;
+      });
+  useFocusEffect(useCallback(() => void run(call("/api/leaderboard")), [call]));
   if (prefs.protectedSessions.length > 0)
     return (
       <View style={s.lock}>
         <Text style={s.text}>Classements masqués : ils dévoileraient une session protégée.</Text>
       </View>
     );
-  const rows = data?.[scope] ?? [];
+  const league = data?.leagues.find((l) => l.id === scope);
+  const rows = scope === "general" || scope === "friends" ? data?.[scope] : league?.rows;
+  const input = {
+    borderWidth: 1,
+    borderColor: c.line,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    color: c.ink,
+    backgroundColor: c.card,
+  };
+  const max = Math.max(
+    1,
+    ...(data?.history ?? []).map((h) => Math.max(h.points ?? 0, h.best.points)),
+  );
   return (
     <>
       <Pills
         options={[
           ["general", "Général"],
           ["friends", "Entre amis"],
+          ...(data?.leagues ?? []).map((l): [string, string] => [l.id, l.name]),
+          ["history", "Mes manches"],
         ]}
         value={scope}
         onChange={setScope}
       />
       {!!error && <Text style={s.error}>{error}</Text>}
-      {data && scope === "general" && <Text style={s.small}>{data.players} joueurs inscrits</Text>}
-      <View style={s.card}>
-        {rows.map((r) => (
-          <View key={r.pseudo} style={[s.rank, r.me && s.mine]}>
-            <Text style={[s.position, { width: 36 }]}>{r.rank}</Text>
-            <Text style={[s.text, { flex: 1 }]}>{r.pseudo}</Text>
-            <Text style={s.small}>{r.weekends} GP</Text>
-            <Text style={[s.time, { width: 70, textAlign: "right" }]}>{r.points} pts</Text>
+      {scope === "history" ? (
+        <>
+          <Text style={s.small}>
+            Vos points à chaque Grand Prix (barre), le meilleur score de la manche (trait) et votre
+            place au général après la manche.
+          </Text>
+          <View style={s.card}>
+            {(data?.history ?? []).map((h) => (
+              <View key={h.eventId} style={{ gap: 4, paddingVertical: 6 }}>
+                <View style={{ flexDirection: "row" }}>
+                  <Text style={[s.text, { flex: 1 }]} numberOfLines={1}>
+                    {h.name.replace(" Grand Prix", "")}
+                  </Text>
+                  <Text style={s.time}>
+                    {h.points ?? "—"} pts · {ordinal(h.rank)}
+                  </Text>
+                </View>
+                <View style={{ height: 10, justifyContent: "center" }}>
+                  <View
+                    style={{
+                      width: `${((h.points ?? 0) / max) * 100}%`,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: c.accent,
+                    }}
+                  />
+                  <View
+                    style={{
+                      position: "absolute",
+                      left: `${(h.best.points / max) * 100}%`,
+                      width: 2,
+                      height: 14,
+                      marginLeft: -1,
+                      backgroundColor: c.ink,
+                    }}
+                  />
+                </View>
+                <Text style={s.small}>
+                  Meilleur : {h.best.pseudo} ({h.best.points} pts)
+                </Text>
+              </View>
+            ))}
+            {data && !data.history.length && (
+              <Text style={s.small}>Aucune manche jouée avec résultats pour l’instant.</Text>
+            )}
           </View>
-        ))}
-        {scope === "friends" && rows.length <= 1 && (
-          <Text style={s.small}>Ajoutez des amis dans l’onglet Amis pour vous comparer.</Text>
-        )}
+        </>
+      ) : (
+        <>
+          {data && scope === "general" && (
+            <Text style={s.small}>{data.players} joueurs inscrits</Text>
+          )}
+          {league && (
+            <Text style={s.small}>
+              Code d’invitation :{" "}
+              <Text style={{ color: c.accent, fontWeight: "700" }}>{league.code}</Text>
+            </Text>
+          )}
+          <View style={s.card}>
+            {(rows ?? []).map((r) => (
+              <View key={r.pseudo} style={[s.rank, r.me && s.mine]}>
+                <Text style={[s.position, { width: 36 }]}>{r.rank}</Text>
+                <Text style={[s.text, { flex: 1 }]}>{r.pseudo}</Text>
+                <Text style={s.small}>{r.weekends} GP</Text>
+                <Text style={[s.time, { width: 70, textAlign: "right" }]}>{r.points} pts</Text>
+              </View>
+            ))}
+            {scope === "friends" && (rows?.length ?? 0) <= 1 && (
+              <Text style={s.small}>Ajoutez des amis dans l’onglet Amis pour vous comparer.</Text>
+            )}
+          </View>
+          {league && (
+            <Button
+              label="Quitter cette ligue"
+              secondary
+              onPress={() =>
+                run(call(`/api/leagues/${league.id}`, { method: "DELETE" })).then(() =>
+                  setScope("general"),
+                )
+              }
+            />
+          )}
+        </>
+      )}
+      <Text style={s.heading}>Ligues privées</Text>
+      <View style={s.card}>
+        <Text style={s.text}>Créer une ligue</Text>
+        <TextInput
+          style={input}
+          value={name}
+          onChangeText={setName}
+          maxLength={40}
+          placeholder="ex. Les Tifosi du bureau"
+        />
+        <Button
+          label="Créer"
+          onPress={() =>
+            name.trim() &&
+            run(call("/api/leagues", { method: "POST", body: { name } })).then((d) => {
+              const created = d?.leagues.at(-1);
+              if (created) setScope(created.id);
+              setName("");
+            })
+          }
+        />
+        <Text style={s.text}>Rejoindre avec un code</Text>
+        <TextInput
+          style={input}
+          value={code}
+          onChangeText={setCode}
+          maxLength={6}
+          autoCapitalize="characters"
+          placeholder="ex. Q562KW"
+        />
+        <Button
+          label="Rejoindre"
+          secondary
+          onPress={() =>
+            code.trim() &&
+            run(call("/api/leagues/join", { method: "POST", body: { code } })).then((d) => {
+              const joined = d?.leagues.find((l) => l.code === code.trim().toUpperCase());
+              if (joined) setScope(joined.id);
+              setCode("");
+            })
+          }
+        />
       </View>
     </>
   );

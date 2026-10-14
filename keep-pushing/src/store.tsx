@@ -3,7 +3,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { demoSeason } from "./data.mjs";
 import { loadRound, loadSeason } from "./jolpica.mjs";
 import { loadNews, toArticle } from "./news.mjs";
-import { autoProtect, defaults, focusEvents, restorePreferences } from "./model.mjs";
+import { api, hasApi } from "./api.mjs";
+import {
+  applySynced,
+  autoProtect,
+  defaults,
+  focusEvents,
+  restorePreferences,
+  syncedPart,
+} from "./model.mjs";
 
 const KEY = "keep-pushing.preferences.v1";
 export type Prefs = {
@@ -16,6 +24,9 @@ export type Prefs = {
   autoProtect: "off" | "race" | "weekend";
   account: { token: string; id: string; pseudo: string } | null;
   welcomed: boolean;
+  syncedAt: number;
+  betReminders: boolean;
+  theme: "auto" | "light" | "dark";
   frequency: string;
   rumors: boolean;
   reminders: boolean;
@@ -31,6 +42,8 @@ export type Event = {
   round: number;
   name: string;
   circuit: string;
+  circuitId?: string;
+  location?: { lat: number; long: number; locality: string; country: string };
   winner: Row | null;
   sessions: Session[];
 };
@@ -95,10 +108,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     ]).then(([raw, loaded, news]) => {
       if (!alive) return;
       // Sans flux : articles fictifs en démo, aucun en mode réel.
-      if (news) loaded = { ...loaded, articles: news.map((n: Parameters<typeof toArticle>[0]) => toArticle(n, loaded)) };
+      if (news)
+        loaded = {
+          ...loaded,
+          articles: news.map((n: Parameters<typeof toArticle>[0]) => toArticle(n, loaded)),
+        };
       setSeason(loaded);
       if (raw)
-        setPrefs(restorePreferences(raw, loaded.events.flatMap((e) => e.sessions)));
+        setPrefs(
+          restorePreferences(
+            raw,
+            loaded.events.flatMap((e) => e.sessions),
+          ),
+        );
       setReady(true);
     });
     return () => {
@@ -120,6 +142,44 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const timer = setInterval(tick, 60000);
     return () => clearInterval(timer);
   }, [ready, season.events]);
+  // Réglages du compte : lus au démarrage, à la connexion puis toutes les
+  // 5 min ; envoyés 1,5 s après un changement sur cet appareil.
+  const token = prefs.account?.token;
+  const [pulledFor, setPulledFor] = useState<string | null>(null);
+  const pushed = useRef("");
+  useEffect(() => {
+    if (!ready || !token || !hasApi()) return;
+    const sessions = season.events.flatMap((e) => e.sessions);
+    const pull = () =>
+      api("/api/settings", { token })
+        .then(({ data, at }) => {
+          if (data)
+            setPrefs((p) => {
+              if (at <= p.syncedAt) return p;
+              const next = applySynced(p, data, at, sessions) as Prefs;
+              pushed.current = JSON.stringify(syncedPart(next));
+              return next;
+            });
+          setPulledFor(token);
+        })
+        .catch(() => {});
+    pull();
+    const timer = setInterval(pull, 5 * 60000);
+    return () => clearInterval(timer);
+  }, [ready, token]);
+  const part = JSON.stringify(syncedPart(prefs));
+  useEffect(() => {
+    if (!ready || !token || pulledFor !== token || part === pushed.current) return;
+    const timer = setTimeout(() => {
+      api("/api/settings", { method: "PUT", body: { data: JSON.parse(part) }, token })
+        .then(({ at }) => {
+          pushed.current = part;
+          setPrefs((p) => ({ ...p, syncedAt: at }));
+        })
+        .catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [part, ready, token, pulledFor]);
   const focus = useMemo(() => focusEvents(season.events) as Store["focus"], [season]);
   const update = (patch: Partial<Prefs>) => setPrefs((p) => ({ ...p, ...patch }));
   return (

@@ -4,8 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { loadDriverSeason } from "../src/jolpica.mjs";
 import { duel, teammateOf } from "../src/model.mjs";
 import { useStore } from "../src/store";
-import { accentFor } from "../src/teams.mjs";
-import { Button, DriverPicker, Screen, useTheme } from "../src/ui";
+import { Button, DriverPicker, Screen, ordinal, useTheme } from "../src/ui";
 
 type Season = Awaited<ReturnType<typeof loadDriverSeason>>;
 type Row = Season[number];
@@ -20,7 +19,7 @@ type DuelResult = {
 // Duel de deux pilotes sur la saison : par défaut mon pilote face à son
 // coéquipier, mais n'importe quels pilotes, même d'écuries différentes.
 export default function Duel() {
-  const { s, c } = useTheme();
+  const { s, c, team } = useTheme();
   const { prefs, season } = useStore();
   const router = useRouter();
   const params = useLocalSearchParams<{ a?: string; b?: string }>();
@@ -50,8 +49,8 @@ export default function Duel() {
     setEditing(null);
   };
   const sameTeam = me && mate && me.teamId === mate.teamId;
-  const colorA = me ? accentFor(me.teamId) : c.accent;
-  const colorB = !mate ? c.muted : sameTeam ? c.ink : accentFor(mate.teamId);
+  const colorA = me ? team(me.teamId) : c.accent;
+  const colorB = !mate ? c.muted : sameTeam ? c.ink : team(mate.teamId);
   const Side = ({ side, id }: { side: "a" | "b"; id: string }) => {
     const d = season.drivers.find((x) => x.id === id);
     return (
@@ -122,7 +121,7 @@ export default function Duel() {
       </View>
     );
   };
-  const pos = (n?: number, dnf?: boolean) => (dnf ? "Ab." : n ? `${n}e` : "—");
+  const pos = (n?: number, dnf?: boolean) => (dnf ? "Ab." : n ? ordinal(n) : "—");
   return (
     <Screen>
       {back}
@@ -161,7 +160,7 @@ export default function Duel() {
               title="Meilleur résultat"
               values={d.best}
               lowerWins
-              format={(v) => (Number.isFinite(v) ? `${v}e` : "—")}
+              format={(v) => (Number.isFinite(v) ? ordinal(v) : "—")}
             />
           </View>
           <Text style={s.heading}>Grand Prix par Grand Prix</Text>

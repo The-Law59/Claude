@@ -13,6 +13,10 @@ import {
   reminderPlan,
   focusEvents,
   setMine,
+  betReminderPlan,
+  applySynced,
+  syncedPart,
+  SYNCED,
 } from "../src/model.mjs";
 test("Une session protégée masque son article même dans toute la F1", () => {
   const p = setProtected(defaults(), RACE, true);
@@ -197,4 +201,31 @@ test("Saison d'un pilote au format Jolpica, abandon repéré", () => {
   );
   assert.deepEqual(season[0], { round: 1, name: "GP1", race: 3, dnf: false, points: 15, quali: 4 });
   assert.equal(season[1].dnf, true);
+});
+
+test("Rappels de paris : 1 h avant qualifs, sprint et course, avec un compte", () => {
+  const sessions = [
+    { id: "e:FirstPractice", type: "FirstPractice", startsAt: "2026-05-01T10:00:00Z" },
+    { id: "e:Qualifying", type: "Qualifying", startsAt: "2026-05-02T14:00:00Z" },
+    { id: "e:Race", type: "Race", startsAt: "2026-05-03T13:00:00Z" },
+  ];
+  const now = Date.parse("2026-05-02T13:30:00Z");
+  const prefs = { betReminders: true, account: { token: "t" } };
+  const plan = betReminderPlan(sessions, prefs, now, "GP");
+  assert.deepEqual(plan.map((r) => r.id), ["bet-e:Race"]); // qualifs : rappel déjà passé
+  assert.equal(plan[0].date, Date.parse("2026-05-03T12:00:00Z"));
+  assert.deepEqual(betReminderPlan(sessions, { ...prefs, account: null }, now), []);
+});
+
+test("Réglages synchronisés : seulement les clés partagées, validées", () => {
+  const sessions = [{ id: "e:Race" }];
+  const local = { ...defaults(), account: { token: "t", id: "u", pseudo: "Q" }, reminders: true };
+  const next = applySynced(local, { myDriver: "driver-x", protectedSessions: ["e:Race", "inconnue"], theme: "dark", reminders: false, account: null }, 42, sessions);
+  assert.equal(next.myDriver, "driver-x");
+  assert.deepEqual(next.protectedSessions, ["e:Race"]);
+  assert.equal(next.theme, "dark");
+  assert.equal(next.reminders, true); // propre au téléphone
+  assert.equal(next.account.pseudo, "Q");
+  assert.equal(next.syncedAt, 42);
+  assert.deepEqual(Object.keys(syncedPart(next)).sort(), [...SYNCED].sort());
 });

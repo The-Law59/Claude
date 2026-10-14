@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadRound, loadSeason, parseRound, parseSeason } from "../src/jolpica.mjs";
+import { loadRound, loadSeason, parseRound, parseSeason, parseTeamSeason } from "../src/jolpica.mjs";
 
 // Réponses au format Jolpica/Ergast, réduites au strict nécessaire pour le test.
 const driver = { driverId: "test_driver", givenName: "Test", familyName: "Pilote" };
@@ -99,4 +99,18 @@ test("Chargement : saison, GP à la demande, erreurs", async () => {
     loadSeason(fake({ "/current.json": empty, "/results/1.json": empty, driverStandings: MRData.drivers, constructorStandings: MRData.teams })),
     /Calendrier vide/,
   );
+});
+
+test("Saison d'une écurie : points course + sprint, meilleure place", () => {
+  const races = (key, rows) => ({
+    RaceTable: { Races: rows.map(([round, list]) => ({ round, raceName: `GP${round}`, [key]: list })) },
+  });
+  const season = parseTeamSeason(
+    races("Results", [["1", [{ position: "2", points: "18" }, { position: "5", points: "10" }]], ["2", [{ position: "11", points: "0" }, { position: "14", points: "0" }]]]),
+    races("SprintResults", [["2", [{ position: "1", points: "8" }, { position: "9", points: "0" }]]]),
+  );
+  assert.deepEqual(season, [
+    { round: 1, name: "GP1", points: 28, best: 2 },
+    { round: 2, name: "GP2", points: 8, best: 11 },
+  ]);
 });

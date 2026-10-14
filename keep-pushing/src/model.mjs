@@ -8,6 +8,9 @@ export const defaults = () => ({
   autoProtect: "off", // "off" | "race" | "weekend"
   account: null, // compte joueur : { token, id, pseudo }
   welcomed: false, // portail de connexion déjà vu
+  syncedAt: 0, // date des réglages reçus du compte
+  betReminders: false, // rappel 1 h avant la fermeture des paris
+  theme: "auto", // "auto" | "light" | "dark"
   frequency: "important",
   rumors: false,
   reminders: false,
@@ -36,6 +39,9 @@ export function restorePreferences(raw, sessions) {
           ? p.account
           : null,
       welcomed: p.welcomed === true,
+      syncedAt: Number.isFinite(p.syncedAt) ? p.syncedAt : 0,
+      betReminders: p.betReminders === true,
+      theme: ["light", "dark"].includes(p.theme) ? p.theme : "auto",
       myDriver: typeof p.myDriver === "string" ? p.myDriver : "",
       myTeam: typeof p.myTeam === "string" ? p.myTeam : "",
       frequency: p.frequency === "all" ? "all" : "important",
@@ -108,6 +114,29 @@ export function reminderPlan(sessions, prefs, now = Date.now(), name = "") {
       date: new Date(s.startsAt).getTime() - prefs.reminderMinutes * 60000,
     }))
     .filter((x) => x.date > now);
+}
+// Paris : rappel 1 h avant la fermeture de chaque partie (qualifs, sprint, course).
+const BET_SESSIONS = { Qualifying: "top 10 des qualifs", Sprint: "top 8 du sprint", Race: "top 10 de la course" };
+export function betReminderPlan(sessions, prefs, now = Date.now(), name = "") {
+  if (!prefs.betReminders || !prefs.account) return [];
+  return sessions
+    .filter((s) => BET_SESSIONS[s.type])
+    .map((s) => ({
+      id: `bet-${s.id}`,
+      title: "Paris : fermeture dans 1 h",
+      body: `${name} · vérifiez votre ${BET_SESSIONS[s.type]}`,
+      date: Date.parse(s.startsAt) - 3600000,
+    }))
+    .filter((x) => x.date > now);
+}
+// Réglages partagés entre les appareils d'un compte (pas les rappels, propres
+// à chaque téléphone).
+export const SYNCED = ["favorites", "myDriver", "myTeam", "protectedSessions", "revealed", "autoProtect", "frequency", "rumors", "results", "theme"];
+export const syncedPart = (prefs) => Object.fromEntries(SYNCED.map((k) => [k, prefs[k]]));
+// Applique des réglages reçus du serveur, validés comme une restauration.
+export function applySynced(prefs, data, at, sessions) {
+  const clean = restorePreferences(JSON.stringify({ ...prefs, ...syncedPart({ ...prefs, ...data }) }), sessions);
+  return { ...prefs, ...syncedPart(clean), syncedAt: at };
 }
 // Week-end en cours ou à venir, et dernier week-end dont la course a démarré.
 export function focusEvents(events, now = Date.now()) {

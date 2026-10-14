@@ -23,6 +23,7 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: c.accent,
         tabBarInactiveTintColor: c.muted,
+        tabBarStyle: { backgroundColor: c.card, borderTopColor: c.line },
       }}
     >
       {tabs.map(([name, icon, title]) => (

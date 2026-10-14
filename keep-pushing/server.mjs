@@ -12,6 +12,7 @@ import { loadRound, loadSeason } from "./src/jolpica.mjs";
 import { createTranslator } from "./src/translate.mjs";
 import * as accounts from "./src/accounts.mjs";
 import * as bets from "./src/bets.mjs";
+import * as leagues from "./src/leagues.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
 const DATA = join(import.meta.dirname, "data");
@@ -124,8 +125,14 @@ async function betView(event, user) {
     eventId: event.id,
     parts: bets.partsOf(event),
     closes: Object.fromEntries(
-      [...bets.partsOf(event), "fastest", "dnf"].map((p) => [p, bets.closesAt(event, p)]),
+      [...bets.partsOf(event), "fastest", "dnf", "answer", "joker"].map((p) => [
+        p,
+        bets.closesAt(event, p),
+      ]),
     ),
+    question: { ...bets.questionOf(event), answer: bets.answerOf(bets.questionOf(event).id, race) },
+    // GP où le joker de la saison est déjà posé (s'il y en a un autre).
+    jokerOn: jokerEvent(user, event)?.name ?? null,
     mine,
     score: mine && bets.scoreBet(mine, r),
     // Classements réels (ids), pour la colonne « réel » du tableau.
@@ -149,6 +156,9 @@ async function betView(event, user) {
   };
 }
 
+const jokerEvent = (user, event) =>
+  season?.events.find((e) => e.id !== event.id && state.bets[e.id]?.[user.id]?.joker);
+
 async function rankings(user) {
   await Promise.all(
     Object.keys(state.bets)
@@ -156,9 +166,10 @@ async function rankings(user) {
       .filter(Boolean)
       .map((e) => roundResults(e).catch(() => ({}))),
   );
+  const rounds = bets.perRound(state.bets, bySession);
   const rank = (ids) =>
     bets
-      .leaderboard(ids, state.bets, bySession)
+      .leaderboard(ids, rounds)
       .sort(
         (a, b) =>
           b.points - a.points || state.users[a.id].pseudo.localeCompare(state.users[b.id].pseudo),
@@ -176,6 +187,25 @@ async function rankings(user) {
     general: general.filter((r, i) => i < 100 || r.me),
     players: general.length,
     friends: rank([user.id, ...accounts.friendIds(state, user)]),
+    leagues: leagues.leaguesOf(state, user).map((l) => ({
+      id: l.id,
+      name: l.name,
+      code: l.code,
+      rows: rank(l.members.filter((id) => state.users[id])),
+    })),
+    // Manche par manche : mes points, le meilleur du GP, ma place au général.
+    history: bets
+      .history(
+        Object.keys(state.users),
+        rounds,
+        (season?.events ?? []).map((e) => e.id),
+        user.id,
+      )
+      .map((h) => ({
+        ...h,
+        name: findEvent(h.eventId)?.name ?? h.eventId,
+        best: { pseudo: state.users[h.best.id]?.pseudo ?? "—", points: h.best.points },
+      })),
   };
 }
 
@@ -220,17 +250,49 @@ async function api(req, path) {
     return [200, await changed(accounts.friendsView(state, user))];
   }
   if (path === "/api/leaderboard") return [200, await rankings(auth())];
+  if (path === "/api/leagues" && req.method === "POST") {
+    const user = auth();
+    leagues.createLeague(state, user, await readJson(req));
+    return [201, await changed(await rankings(user))];
+  }
+  if (path === "/api/leagues/join" && req.method === "POST") {
+    const user = auth();
+    leagues.joinLeague(state, user, await readJson(req));
+    return [200, await changed(await rankings(user))];
+  }
+  const league = path.match(/^\/api\/leagues\/([\w-]+)$/);
+  if (league && req.method === "DELETE") {
+    const user = auth();
+    leagues.leaveLeague(state, user, league[1]);
+    return [200, await changed(await rankings(user))];
+  }
+  // Réglages synchronisés entre appareils (favoris, anti-spoil…) : stockés
+  // tels quels pour le joueur, validés par l'app à la lecture.
+  if (path === "/api/settings") {
+    const user = auth();
+    if (req.method === "PUT") {
+      const { data } = await readJson(req);
+      if (!data || typeof data !== "object" || Array.isArray(data))
+        return [400, { error: "Réglages invalides." }];
+      user.settings = { data, at: Date.now() };
+      await save();
+    }
+    return [200, user.settings ?? { data: null, at: 0 }];
+  }
   const bet = path.match(/^\/api\/bets\/([\w-]+)$/);
   if (bet) {
     const user = auth();
     const event = findEvent(bet[1]);
     if (!event) return [404, { error: "Grand Prix inconnu." }];
     if (req.method === "PUT") {
+      const body = await readJson(req);
+      const other = body?.joker === true && jokerEvent(user, event);
+      if (other) return [409, { error: `Joker déjà posé sur ${other.name}.` }];
       state.bets[event.id] ??= {};
       state.bets[event.id][user.id] = bets.mergeBet(
         event,
         state.bets[event.id][user.id],
-        await readJson(req),
+        body,
         (season?.drivers ?? []).map((d) => d.id),
       );
       await save();

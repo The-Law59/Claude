@@ -14,7 +14,7 @@ function Gate() {
         <Text style={s.small}>Votre paddock se prépare…</Text>
       </View>
     );
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }} />;
 }
 
 export default function RootLayout() {

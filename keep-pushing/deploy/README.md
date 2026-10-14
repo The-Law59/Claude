@@ -48,6 +48,10 @@ Le même volume Docker garde aussi les **comptes, amis et paris**
 docker compose -f /opt/keep-pushing/keep-pushing/docker-compose.yml cp keep-pushing:/app/data ./sauvegarde-keep-pushing
 ```
 
+Météo : les téléphones interrogent directement Open-Meteo (gratuit, sans clé,
+pour un usage non commercial ; une version payante est nécessaire si l'app
+devient commerciale).
+
 Mot de passe oublié par un joueur : l'app s'arrête une minute, le temps de
 lui en générer un nouveau (affiché à l'écran, à lui transmettre) :
 ```bash

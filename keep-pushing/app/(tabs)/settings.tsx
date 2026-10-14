@@ -17,13 +17,18 @@ export default function Settings() {
     api("/api/logout", { method: "POST", token: prefs.account?.token }).catch(() => {});
     update({ account: null });
   };
-  const setReminder = async (value: boolean, minutes = prefs.reminderMinutes) => {
+  const setReminders = async (patch: Partial<typeof prefs>) => {
     if (busy.current) return;
     busy.current = true;
     try {
-      const next = { ...prefs, reminders: value, reminderMinutes: minutes };
+      const next = { ...prefs, ...patch };
       setNotice(await syncReminders(next, focus.current));
-      update({ reminders: value && Platform.OS !== "web", reminderMinutes: minutes });
+      const native = Platform.OS !== "web";
+      update({
+        ...patch,
+        reminders: next.reminders && native,
+        betReminders: next.betReminders && native,
+      });
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Échec de programmation des rappels.");
     } finally {
@@ -39,6 +44,10 @@ export default function Settings() {
           {prefs.account ? (
             <>
               <Text style={s.text}>Connecté en tant que {prefs.account.pseudo}</Text>
+              <Text style={s.small}>
+                Favoris, anti-spoil, filtres d’actus et thème suivent votre compte sur tous vos
+                téléphones.
+              </Text>
               <Button label="Se déconnecter" secondary onPress={logout} />
             </>
           ) : (
@@ -46,6 +55,16 @@ export default function Settings() {
           )}
         </>
       )}
+      <Text style={s.heading}>Affichage</Text>
+      <Pills
+        options={[
+          ["auto", "Comme le téléphone"],
+          ["light", "Clair"],
+          ["dark", "Sombre"],
+        ]}
+        value={prefs.theme}
+        onChange={(theme) => update({ theme })}
+      />
       <Text style={s.heading}>Anti-spoil</Text>
       <Text style={s.text}>Protection automatique</Text>
       <Pills
@@ -58,8 +77,8 @@ export default function Settings() {
         onChange={(autoProtect) => update({ autoProtect })}
       />
       <Text style={s.small}>
-        Les sessions choisies se protègent seules 5 minutes avant le départ (jusqu’à 48 h
-        après). Une session marquée « regardée » reste visible.
+        Les sessions choisies se protègent seules 5 minutes avant le départ (jusqu’à 48 h après).
+        Une session marquée « regardée » reste visible.
       </Text>
       {[...new Set([focus.last, focus.current])].map((event) => (
         <View key={event.id}>
@@ -106,23 +125,33 @@ export default function Settings() {
         detail="Bloqués pour les sessions protégées."
       />
       <Text style={s.small}>
-        Préférences préparées pour le futur service d’alertes. Aucune alerte
-        d’actualité ou de résultat n’est envoyée dans cette version.
+        Préférences préparées pour le futur service d’alertes. Aucune alerte d’actualité ou de
+        résultat n’est envoyée dans cette version.
       </Text>
       <Text style={s.heading}>Rappels de sessions</Text>
       <Toggle
         label="Activer les rappels locaux"
         value={prefs.reminders}
-        onChange={(on) => void setReminder(on)}
+        onChange={(on) => void setReminders({ reminders: on })}
         detail={`Pour les sessions du ${focus.current.name}.`}
       />
       <Pills
         options={[10, 30, 60].map((m) => [m, `${m} min`] as [number, string])}
         value={prefs.reminderMinutes}
         onChange={(m) =>
-          prefs.reminders ? void setReminder(true, m) : update({ reminderMinutes: m })
+          prefs.reminders
+            ? void setReminders({ reminderMinutes: m })
+            : update({ reminderMinutes: m })
         }
       />
+      {!!prefs.account && (
+        <Toggle
+          label="Rappel avant la fermeture des paris"
+          value={prefs.betReminders}
+          onChange={(on) => void setReminders({ betReminders: on })}
+          detail="1 h avant les qualifs, le sprint et la course."
+        />
+      )}
       {!!notice && (
         <Text accessibilityLiveRegion="polite" style={s.small}>
           {notice}
@@ -130,9 +159,8 @@ export default function Settings() {
       )}
       <Text style={s.heading}>Keep Pushing · 0.2</Text>
       <Text style={s.small}>
-        Sans compte. Aucune affiliation à Formula 1. Calendrier et résultats fournis
-        par l’API publique Jolpica quand le réseau est disponible, sinon données de
-        démonstration.
+        Aucune affiliation à Formula 1. Calendrier et résultats fournis par l’API publique Jolpica
+        quand le réseau est disponible, sinon données de démonstration.
       </Text>
     </Screen>
   );

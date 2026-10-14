@@ -5,7 +5,7 @@ import { useStore } from "../../src/store";
 import { Button, Screen, SourceBadge, formatDate, useTheme } from "../../src/ui";
 
 export default function Article() {
-  const { s } = useTheme();
+  const { s, c } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { prefs, season } = useStore();
   const router = useRouter();
@@ -43,7 +43,7 @@ export default function Article() {
             </Text>
           </View>
           {article.kind === "unofficial" && (
-            <View style={[s.lock, { backgroundColor: "#fbeedd" }]}>
+            <View style={[s.lock, { backgroundColor: c.warn }]}>
               <Text style={s.text}>
                 Source non officielle : information à vérifier, elle peut être inexacte ou
                 relever de la rumeur.

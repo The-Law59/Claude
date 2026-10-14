@@ -28,5 +28,31 @@ export const contrastWithWhite = (hex) => 1.05 / (luminance(hex) + 0.05);
 // Fond pâle dérivé de l'accent (cartes surlignées, boutons secondaires).
 export const tint = (hex, amount = 0.1) =>
   `#${rgb(hex)
-    .map((v) => Math.round(255 - (255 - v) * amount).toString(16).padStart(2, "0"))
+    .map((v) =>
+      Math.round(255 - (255 - v) * amount)
+        .toString(16)
+        .padStart(2, "0"),
+    )
     .join("")}`;
+
+export const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+// Mélange de deux couleurs (t = part de b).
+export const mix = (a, b, t) =>
+  `#${rgb(a)
+    .map((v, i) =>
+      Math.round(v + (rgb(b)[i] - v) * t)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+// Mode sombre : couleur éclaircie juste assez pour 4,5:1 sur le fond donné.
+export function readableOn(hex, bg) {
+  for (let t = 0; t <= 1; t += 0.05) {
+    const c = mix(hex, "#ffffff", t);
+    if (contrast(c, bg) >= 4.5) return c;
+  }
+  return "#ffffff";
+}

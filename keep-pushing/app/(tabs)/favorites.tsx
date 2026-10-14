@@ -2,10 +2,9 @@ import { Pressable, Text, View } from "react-native";
 import { setMine } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
 import { Screen, Toggle, useTheme } from "../../src/ui";
-import { accentFor } from "../../src/teams.mjs";
 
 export default function Favorites() {
-  const { s } = useTheme();
+  const { s, team } = useTheme();
   const { prefs, setPrefs, update, season } = useStore();
   const toggle = (id: string, on: boolean) =>
     update({
@@ -27,7 +26,7 @@ export default function Favorites() {
             {list.map((f) => {
               const selected = prefs[key] === f.id;
               // Chaque écurie s'affiche dans sa couleur ; un pilote dans celle de son écurie.
-              const color = accentFor("teamId" in f ? f.teamId : f.id);
+              const color = team("teamId" in f ? f.teamId : f.id);
               return (
                 <Pressable
                   key={f.id}

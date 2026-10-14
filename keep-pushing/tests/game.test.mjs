@@ -1,7 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as accounts from "../src/accounts.mjs";
-import { mergeBet, scoreBet, scoreList, visibleBet, leaderboard, partsOf, POINTS } from "../src/bets.mjs";
+import {
+  mergeBet, scoreBet, scoreList, visibleBet, leaderboard, partsOf, perRound, history,
+  questionOf, answerOf, closesAt, POINTS,
+} from "../src/bets.mjs";
+import { createLeague, joinLeague, leaveLeague, leaguesOf } from "../src/leagues.mjs";
 
 const fresh = () => ({ users: {}, sessions: {}, bets: {} });
 const rejects = (p, status) => assert.rejects(p, (e) => e.status === status);
@@ -119,11 +123,67 @@ test("Meilleur tour, abandons et total ; résultats absents = null", () => {
   assert.equal(s.dnf, POINTS.dnfClose); // 3 abandons (R), forfaits exclus
   assert.equal(s.quali, null);
   assert.equal(s.total, 120 + POINTS.fastest + POINTS.dnfClose);
-  assert.deepEqual(scoreBet(bet, {}), { total: 0, quali: null, sprint: null, race: null, fastest: null, dnf: null });
+  assert.deepEqual(scoreBet(bet, {}), {
+    total: 0, quali: null, sprint: null, race: null, fastest: null, dnf: null, answer: null, joker: false,
+  });
+  // Joker : tout le week-end compte double.
+  assert.equal(scoreBet({ ...bet, joker: true }, { Race: race }).total, s.total * 2);
 
-  const board = leaderboard(["u1", "u2"], { e1: { u1: bet }, e2: { u1: bet } }, (id) => (id === "e1" ? { Race: race } : undefined));
-  assert.deepEqual(board, [
+  const rounds = perRound({ e1: { u1: bet }, e2: { u1: bet } }, (id) => (id === "e1" ? { Race: race } : undefined));
+  assert.deepEqual(rounds, { e1: { u1: s.total } });
+  assert.deepEqual(leaderboard(["u1", "u2"], rounds), [
     { id: "u1", points: s.total, weekends: 1 },
     { id: "u2", points: 0, weekends: 0 },
+  ]);});
+
+test("Question du week-end : choisie par manche, réponse tirée des résultats", () => {
+  assert.equal(questionOf({ round: 0 }).id, "pole");
+  assert.notEqual(questionOf({ round: 1 }).id, questionOf({ round: 2 }).id);
+  const row = (driverId, position, grid, team, value = "1:30:00") => ({ driverId, position, grid, team, value });
+  const race = [row("a", 1, 3, "McLaren"), row("b", 2, 12, "Ferrari", "+4.512"), row("c", 3, 1, "Mercedes", "+1:02.000"), row("d", 4, 0, "Haas")];
+  assert.equal(answerOf("pole", race), false);
+  assert.equal(answerOf("comeback", race), true);
+  assert.equal(answerOf("gap", race), false);
+  assert.equal(answerOf("gap", [race[0], { ...race[1], value: "+1:00.100" }]), true);
+  assert.equal(answerOf("gap", [race[0], { ...race[1], value: "Lapped" }]), true);
+  assert.equal(answerOf("podium:Ferrari", race), true);
+  assert.equal(answerOf("podium:Red Bull", race), false);
+  assert.equal(answerOf("pole", []), null);
+});
+
+test("Réponse et joker : enregistrés tant que c'est ouvert", () => {
+  const ev = { ...sprintWeekend, round: 4 };
+  const bet = mergeBet(ev, {}, { answer: true, joker: true }, ids, T - 30 * H);
+  assert.equal(bet.question, questionOf(ev).id);
+  assert.equal(bet.joker, true);
+  assert.equal(closesAt(ev, "joker"), T); // départ du sprint, première partie pariée
+  // Joker figé après le début du week-end, réponse encore modifiable.
+  const later = mergeBet(ev, bet, { answer: false, joker: false }, ids, T + H);
+  assert.deepEqual([later.answer, later.joker], [false, true]);
+  throws(() => mergeBet(ev, {}, { answer: "peut-être" }, ids, T), 400);
+});
+
+test("Historique manche par manche : points, meilleur, place au cumul", () => {
+  const rounds = { e1: { a: 30, b: 50 }, e3: { a: 60, b: 20 } };
+  assert.deepEqual(history(["a", "b", "c"], rounds, ["e1", "e2", "e3"], "a"), [
+    { eventId: "e1", points: 30, best: { id: "b", points: 50 }, total: 30, rank: 2 },
+    { eventId: "e3", points: 60, best: { id: "a", points: 60 }, total: 90, rank: 1 },
   ]);
+});
+
+test("Ligues privées : création, code, adhésion, départ", () => {
+  const state = { leagues: {} };
+  const [a, b] = [{ id: "a" }, { id: "b" }];
+  const l = createLeague(state, a, { name: "  Les   Tifosi " });
+  assert.equal(l.name, "Les Tifosi");
+  assert.match(l.code, /^[A-HJ-NP-Z2-9]{6}$/);
+  joinLeague(state, b, { code: l.code.toLowerCase() });
+  joinLeague(state, b, { code: l.code }); // déjà membre : sans effet
+  assert.deepEqual(state.leagues[l.id].members, ["a", "b"]);
+  throws(() => joinLeague(state, b, { code: "XXXXXX" }), 404);
+  throws(() => createLeague(state, a, { name: "" }), 400);
+  leaveLeague(state, a, l.id);
+  assert.deepEqual(leaguesOf(state, a), []);
+  leaveLeague(state, b, l.id);
+  assert.deepEqual(state.leagues, {}); // vide : supprimée
 });
