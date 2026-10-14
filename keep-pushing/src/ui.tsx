@@ -381,3 +381,24 @@ const makeStyles = (c: typeof base) =>
   },
   error: { color: "#9c3020", padding: 12, fontSize: 13 },
 });
+
+// Choix d'un pilote : pastilles aux couleurs des écuries.
+export function DriverPicker({ onPick }: { onPick: (id: string) => void }) {
+  const { s } = useTheme();
+  const { season } = useStore();
+  return (
+    <View style={s.pills}>
+      {season.drivers.map((d) => (
+        <Pressable
+          key={d.id}
+          accessibilityRole="button"
+          accessibilityLabel={d.name}
+          onPress={() => onPick(d.id)}
+          style={[s.pill, { borderColor: accentFor(d.teamId) }]}
+        >
+          <Text style={[s.text, { color: accentFor(d.teamId) }]}>{d.name.split(" ").at(-1)}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}

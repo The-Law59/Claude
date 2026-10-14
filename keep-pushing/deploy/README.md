@@ -42,10 +42,19 @@ par l'API Claude si une clé est fournie. Sans clé, ils restent en anglais.
 
 Chaque article n'est traduit qu'une fois (cache conservé entre les mises à jour).
 
-Le même volume Docker garde aussi les **pronostics** de vos groupes
-(`/app/data/predictions.json`). Pour une sauvegarde :
+Le même volume Docker garde aussi les **comptes, amis et paris**
+(`/app/data/game.json`). Pour une sauvegarde :
 ```bash
 docker compose -f /opt/keep-pushing/keep-pushing/docker-compose.yml cp keep-pushing:/app/data ./sauvegarde-keep-pushing
+```
+
+Mot de passe oublié par un joueur : l'app s'arrête une minute, le temps de
+lui en générer un nouveau (affiché à l'écran, à lui transmettre) :
+```bash
+cd /opt/keep-pushing/keep-pushing
+docker compose stop
+docker compose run --rm keep-pushing node scripts/reset-password.mjs <pseudo>
+docker compose start
 ```
 
 ## 4. Sur le téléphone

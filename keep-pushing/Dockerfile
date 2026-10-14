@@ -14,6 +14,7 @@ RUN npm init -y >/dev/null && npm install --omit=dev @anthropic-ai/sdk@0.133.0 &
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/src ./src
 COPY server.mjs ./
+COPY scripts ./scripts
 USER node
 EXPOSE 3000
 CMD ["node", "server.mjs"]

@@ -1,15 +1,22 @@
 import { useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { api, hasApi } from "../../src/api.mjs";
 import { protectWeekend, setProtected } from "../../src/model.mjs";
 import { syncReminders } from "../../src/reminders";
 import { useStore } from "../../src/store";
-import { Pills, Screen, Toggle, useTheme } from "../../src/ui";
+import { Button, Pills, Screen, Toggle, useTheme } from "../../src/ui";
 
 export default function Settings() {
   const { s } = useTheme();
   const { prefs, setPrefs, update, focus } = useStore();
   const [notice, setNotice] = useState("");
   const busy = useRef(false);
+  const router = useRouter();
+  const logout = () => {
+    api("/api/logout", { method: "POST", token: prefs.account?.token }).catch(() => {});
+    update({ account: null });
+  };
   const setReminder = async (value: boolean, minutes = prefs.reminderMinutes) => {
     if (busy.current) return;
     busy.current = true;
@@ -26,6 +33,19 @@ export default function Settings() {
   return (
     <Screen>
       <Text style={s.title}>À votre rythme.</Text>
+      {hasApi() && (
+        <>
+          <Text style={s.heading}>Compte</Text>
+          {prefs.account ? (
+            <>
+              <Text style={s.text}>Connecté en tant que {prefs.account.pseudo}</Text>
+              <Button label="Se déconnecter" secondary onPress={logout} />
+            </>
+          ) : (
+            <Button label="Se connecter ou créer un compte" onPress={() => router.push("/login")} />
+          )}
+        </>
+      )}
       <Text style={s.heading}>Anti-spoil</Text>
       <Text style={s.text}>Protection automatique</Text>
       <Pills

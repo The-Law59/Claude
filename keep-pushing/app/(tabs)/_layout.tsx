@@ -1,5 +1,7 @@
 import { Text } from "react-native";
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
+import { hasApi } from "../../src/api.mjs";
+import { useStore } from "../../src/store";
 import { useTheme } from "../../src/ui";
 
 const tabs = [
@@ -12,6 +14,9 @@ const tabs = [
 
 export default function TabsLayout() {
   const { c } = useTheme();
+  const { prefs } = useStore();
+  // Premier lancement : portail de connexion (si un serveur est joignable).
+  if (!prefs.welcomed && !prefs.account && hasApi()) return <Redirect href="/login" />;
   return (
     <Tabs
       screenOptions={{

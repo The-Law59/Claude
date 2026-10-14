@@ -6,7 +6,8 @@ export const defaults = () => ({
   protectedSessions: [],
   revealed: [], // sessions marquées « vues » : l'anti-spoil auto ne les reprotège pas
   autoProtect: "off", // "off" | "race" | "weekend"
-  group: null, // pronostics : { groupId, memberId, token, name, code }
+  account: null, // compte joueur : { token, id, pseudo }
+  welcomed: false, // portail de connexion déjà vu
   frequency: "important",
   rumors: false,
   reminders: false,
@@ -30,10 +31,11 @@ export function restorePreferences(raw, sessions) {
         ? p.revealed.filter((x) => sessions.some((s) => s.id === x))
         : [],
       autoProtect: ["race", "weekend"].includes(p.autoProtect) ? p.autoProtect : "off",
-      group:
-        p.group && ["groupId", "memberId", "token", "name", "code"].every((k) => typeof p.group[k] === "string")
-          ? p.group
+      account:
+        p.account && ["token", "id", "pseudo"].every((k) => typeof p.account[k] === "string")
+          ? p.account
           : null,
+      welcomed: p.welcomed === true,
       myDriver: typeof p.myDriver === "string" ? p.myDriver : "",
       myTeam: typeof p.myTeam === "string" ? p.myTeam : "",
       frequency: p.frequency === "all" ? "all" : "important",
@@ -123,16 +125,6 @@ export function setMine(prefs, key, id) {
     favorites: id && !prefs.favorites.includes(id) ? [...prefs.favorites, id] : prefs.favorites,
   };
 }
-// Pronostics fermés au début de la première séance qualificative du week-end
-// (qualifs sprint comprises) : règle partagée par l'app et le serveur.
-export function lockTime(event) {
-  const quali = event.sessions.filter((s) =>
-    ["SprintQualifying", "Sprint", "Qualifying"].includes(s.type),
-  );
-  return Date.parse((quali[0] ?? event.sessions.at(-1)).startsAt);
-}
-// Résultats d'un GP considérés publiés 3 h après le départ de la course.
-export const resultsReadyAt = (event) => Date.parse(event.sessions.at(-1).startsAt) + 3 * 3600000;
 // Coéquipier : même écurie, celui qui a le plus de points (changements de baquet).
 export const teammateOf = (drivers, driverId) => {
   const me = drivers.find((d) => d.id === driverId);

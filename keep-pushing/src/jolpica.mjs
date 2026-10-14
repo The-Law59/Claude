@@ -20,6 +20,9 @@ function rows(race, pick) {
     name: person(x.Driver),
     team: x.Constructor.name,
     value: pick(x),
+    // Pour les paris : non classés (R, D…) et meilleur tour.
+    ...(x.positionText && { positionText: x.positionText }),
+    ...(x.FastestLap?.rank === "1" && { fastestLap: true }),
   }));
 }
 const raceTime = (x) => x.Time?.time ?? x.status;

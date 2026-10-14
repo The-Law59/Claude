@@ -19,23 +19,8 @@ export async function api(path, { method = "GET", body, token } = {}) {
     body: body && JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `Serveur indisponible (${res.status}).`);
+  if (!res.ok)
+    throw Object.assign(new Error(data.error ?? `Serveur indisponible (${res.status}).`), { status: res.status });
   return data;
 }
 
-// Profil de pronos sans compte : la clé « groupe.membre.secret » suffit à le
-// retrouver sur un autre appareil, via un lien …/pronos?cle=… ou en la collant.
-/** @param {{ groupId: string, memberId: string, token: string }} g */
-export const memberKey = (g) => `${g.groupId}.${g.memberId}.${g.token}`;
-
-/** @param {string} key */
-export const loginLink = (key) =>
-  `${API_URL || (typeof location !== "undefined" ? location.origin : "")}/pronos?cle=${key}`;
-
-/** Accepte la clé seule ou le lien complet. @param {string} text */
-export function parseMemberKey(text) {
-  const key = String(text).trim().split("cle=").at(-1).split(/[&#\s]/)[0];
-  const [groupId, memberId, token, ...rest] = key.split(".");
-  const ok = /^[\w.-]+$/.test(key) && groupId && memberId && token && rest.length === 0;
-  return ok ? { groupId, memberId, token } : null;
-}

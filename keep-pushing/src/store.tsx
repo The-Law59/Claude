@@ -14,7 +14,8 @@ export type Prefs = {
   protectedSessions: string[];
   revealed: string[];
   autoProtect: "off" | "race" | "weekend";
-  group: { groupId: string; memberId: string; token: string; name: string; code: string } | null;
+  account: { token: string; id: string; pseudo: string } | null;
+  welcomed: boolean;
   frequency: string;
   rumors: boolean;
   reminders: boolean;

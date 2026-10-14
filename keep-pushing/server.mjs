@@ -2,7 +2,7 @@
 // - export statique de l'app (dist/) ;
 // - /api/news.json : veille actualités fusionnée, traduite en français si
 //   ANTHROPIC_API_KEY est défini (les navigateurs ne peuvent pas lire les flux) ;
-// - /api/groups… : pronostics entre amis, sauvegardés dans data/.
+// - /api/… comptes, amis et paris (data/game.json).
 import { createServer } from "node:http";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
@@ -10,8 +10,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { fetchFeeds } from "./src/news.mjs";
 import { loadRound, loadSeason } from "./src/jolpica.mjs";
 import { createTranslator } from "./src/translate.mjs";
-import * as predictions from "./src/predictions.mjs";
-import { resultsReadyAt } from "./src/model.mjs";
+import * as accounts from "./src/accounts.mjs";
+import * as bets from "./src/bets.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
 const DATA = join(import.meta.dirname, "data");
@@ -28,7 +28,8 @@ const TYPES = {
 };
 
 const client = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
-const translate = client && (await createTranslator({ client, cacheFile: join(DATA, "translations.json") }));
+const translate =
+  client && (await createTranslator({ client, cacheFile: join(DATA, "translations.json") }));
 if (!client) console.warn("ANTHROPIC_API_KEY absent : actualités anglaises non traduites.");
 
 // --- Veille actualités, rafraîchie toutes les 5 min en tâche de fond.
@@ -63,52 +64,131 @@ const refreshSeason = () =>
     .catch((e) => console.warn(`Saison : ${e.message}`));
 await refreshSeason();
 setInterval(refreshSeason, 60 * 60 * 1000);
-const rounds = new Map();
-async function roundResults(event) {
-  if (rounds.has(event.id)) return rounds.get(event.id);
-  if (Date.now() < resultsReadyAt(event)) return {};
-  const results = await loadRound(event);
-  if (results[`${event.id}:Race`]?.length) rounds.set(event.id, results);
-  return results;
-}
 
-// --- Pronostics : état JSON, sauvegardé après chaque modification.
-const PREDICTIONS = join(DATA, "predictions.json");
-const state = JSON.parse(await readFile(PREDICTIONS, "utf8").catch(() => '{"groups":{}}'));
+// Résultats d'un week-end : gardés pour de bon une fois la course publiée,
+// sinon redemandés au plus toutes les 10 min. Une requête Jolpica à la fois
+// (l'API limite les rafales).
+const rounds = new Map();
+const inflight = new Map();
+let queue = Promise.resolve();
+async function roundResults(event) {
+  const cached = rounds.get(event.id);
+  if (cached && (cached.final || Date.now() - cached.at < 10 * 60 * 1000)) return cached.results;
+  const first = Math.min(...bets.partsOf(event).map((p) => bets.closesAt(event, p)));
+  if (Date.now() < first) return {};
+  if (!inflight.has(event.id)) {
+    const next = queue
+      .then(() => loadRound(event))
+      .then((results) => {
+        rounds.set(event.id, {
+          results,
+          at: Date.now(),
+          final: !!results[`${event.id}:Race`]?.length,
+        });
+        return results;
+      })
+      .finally(() => inflight.delete(event.id));
+    inflight.set(event.id, next);
+    queue = next.catch(() => {});
+  }
+  return inflight.get(event.id);
+}
+const bySession = (eventId) => {
+  const r = rounds.get(eventId)?.results;
+  return (
+    r && Object.fromEntries(["Qualifying", "Sprint", "Race"].map((t) => [t, r[`${eventId}:${t}`]]))
+  );
+};
+const findEvent = (id) => season?.events.find((e) => e.id === id);
+
+// --- Comptes, amis et paris : état JSON, sauvegardé après chaque modification.
+const GAME = join(DATA, "game.json");
+const state = JSON.parse(
+  await readFile(GAME, "utf8").catch(() => '{"users":{},"sessions":{},"bets":{}}'),
+);
+const failures = new Map();
 let saving = Promise.resolve();
 const save = () =>
   (saving = saving
     .then(() => mkdir(DATA, { recursive: true }))
-    .then(() => writeFile(PREDICTIONS, JSON.stringify(state)))
-    .catch((e) => console.warn(`Pronostics non sauvegardés : ${e.message}`)));
+    .then(() => writeFile(GAME, JSON.stringify(state)))
+    .catch((e) => console.warn(`Jeu non sauvegardé : ${e.message}`)));
 
-async function groupView(groupId, memberId) {
-  const events = season?.events ?? [];
-  const group = state.groups[groupId];
-  // Résultats nécessaires au calcul des points des GP pronostiqués.
+async function betView(event, user) {
+  const results = await roundResults(event).catch(() => ({}));
+  const r = bySession(event.id) ?? {};
+  const byUser = state.bets[event.id] ?? {};
+  const mine = byUser[user.id] ?? null;
+  const race = results[`${event.id}:Race`];
+  return {
+    eventId: event.id,
+    parts: bets.partsOf(event),
+    closes: Object.fromEntries(
+      [...bets.partsOf(event), "fastest", "dnf"].map((p) => [p, bets.closesAt(event, p)]),
+    ),
+    mine,
+    score: mine && bets.scoreBet(mine, r),
+    // Classements réels (ids), pour la colonne « réel » du tableau.
+    results: {
+      ...Object.fromEntries(
+        Object.entries(r)
+          .filter(([, rows]) => rows?.length)
+          .map(([t, rows]) => [t, rows.map((x) => x.driverId)]),
+      ),
+      fastest: race?.find((x) => x.fastestLap)?.driverId ?? null,
+      dnf: race?.length ? bets.dnfCount(race) : null,
+    },
+    friends: accounts
+      .friendIds(state, user)
+      .filter((id) => byUser[id])
+      .map((id) => ({
+        pseudo: state.users[id].pseudo,
+        bet: bets.visibleBet(event, byUser[id]),
+        score: bets.scoreBet(bets.visibleBet(event, byUser[id]), r).total,
+      })),
+  };
+}
+
+async function rankings(user) {
   await Promise.all(
-    Object.keys(group.predictions)
-      .map((id) => events.find((e) => e.id === id))
+    Object.keys(state.bets)
+      .map(findEvent)
       .filter(Boolean)
       .map((e) => roundResults(e).catch(() => ({}))),
   );
-  const resultsFor = (eventId) => {
-    const r = rounds.get(eventId);
-    return r && { race: r[`${eventId}:Race`], qualifying: r[`${eventId}:Qualifying`] };
+  const rank = (ids) =>
+    bets
+      .leaderboard(ids, state.bets, bySession)
+      .sort(
+        (a, b) =>
+          b.points - a.points || state.users[a.id].pseudo.localeCompare(state.users[b.id].pseudo),
+      )
+      .map((row, i) => ({
+        rank: i + 1,
+        pseudo: state.users[row.id].pseudo,
+        points: row.points,
+        weekends: row.weekends,
+        me: row.id === user.id,
+      }));
+  const general = rank(Object.keys(state.users));
+  return {
+    // Les 100 premiers, plus sa propre ligne si on est plus loin.
+    general: general.filter((r, i) => i < 100 || r.me),
+    players: general.length,
+    friends: rank([user.id, ...accounts.friendIds(state, user)]),
   };
-  return predictions.view(state, groupId, memberId, { events, resultsFor });
 }
 
 async function readJson(req) {
   let body = "";
   for await (const chunk of req) {
     body += chunk;
-    if (body.length > 10000) throw new predictions.PredictionError(413, "Requête trop grosse.");
+    if (body.length > 10000) throw new accounts.GameError(413, "Requête trop grosse.");
   }
   try {
     return JSON.parse(body || "{}");
   } catch {
-    throw new predictions.PredictionError(400, "JSON invalide.");
+    throw new accounts.GameError(400, "JSON invalide.");
   }
 }
 
@@ -117,30 +197,45 @@ async function api(req, path) {
     if (!news) await firstNews;
     return [news ? 200 : 503, news ?? []];
   }
-  if (path === "/api/groups" && req.method === "POST") {
-    const session = predictions.createGroup(state, await readJson(req));
-    await save();
-    return [201, session];
+  const auth = () => accounts.authenticate(state, req.headers.authorization);
+  const changed = async (result) => (await save(), result);
+  if (path === "/api/register" && req.method === "POST")
+    return [201, await changed(await accounts.register(state, await readJson(req)))];
+  if (path === "/api/login" && req.method === "POST")
+    return [200, await changed(await accounts.login(state, await readJson(req), { failures }))];
+  if (path === "/api/logout" && req.method === "POST") {
+    accounts.logout(state, req.headers.authorization);
+    return [200, await changed({})];
   }
-  if (path === "/api/groups/join" && req.method === "POST") {
-    const session = predictions.joinGroup(state, await readJson(req));
-    await save();
-    return [200, session];
+  if (path === "/api/me") return [200, accounts.friendsView(state, auth())];
+  if (path === "/api/friends" && req.method === "POST") {
+    const user = auth();
+    accounts.addFriend(state, user, (await readJson(req)).pseudo);
+    return [200, await changed(accounts.friendsView(state, user))];
   }
-  const m = path.match(/^\/api\/groups\/([\w-]+)(?:\/predictions\/([\w-]+))?$/);
-  if (m) {
-    const { member } = predictions.authenticate(state, m[1], req.headers.authorization);
-    if (m[2] && req.method === "PUT") {
-      predictions.setPrediction(state, {
-        groupId: m[1],
-        memberId: member.id,
-        event: season?.events.find((e) => e.id === m[2]),
-        body: await readJson(req),
-        driverIds: (season?.drivers ?? []).map((d) => d.id),
-      });
+  const friend = path.match(/^\/api\/friends\/([\w-]+)$/);
+  if (friend && req.method === "DELETE") {
+    const user = auth();
+    accounts.removeFriend(state, user, friend[1]);
+    return [200, await changed(accounts.friendsView(state, user))];
+  }
+  if (path === "/api/leaderboard") return [200, await rankings(auth())];
+  const bet = path.match(/^\/api\/bets\/([\w-]+)$/);
+  if (bet) {
+    const user = auth();
+    const event = findEvent(bet[1]);
+    if (!event) return [404, { error: "Grand Prix inconnu." }];
+    if (req.method === "PUT") {
+      state.bets[event.id] ??= {};
+      state.bets[event.id][user.id] = bets.mergeBet(
+        event,
+        state.bets[event.id][user.id],
+        await readJson(req),
+        (season?.drivers ?? []).map((d) => d.id),
+      );
       await save();
     }
-    return [200, await groupView(m[1], member.id)];
+    return [200, await betView(event, user)];
   }
   return [404, { error: "Route inconnue." }];
 }
@@ -153,7 +248,7 @@ createServer(async (req, res) => {
         req.method === "OPTIONS"
           ? [204, ""] // pré-vol CORS
           : await api(req, path).catch((e) => {
-              if (e instanceof predictions.PredictionError) return [e.status, { error: e.message }];
+              if (e instanceof accounts.GameError) return [e.status, { error: e.message }];
               console.warn(`API ${path} : ${e.message}`);
               return [502, { error: "Erreur du serveur." }];
             });
@@ -161,7 +256,7 @@ createServer(async (req, res) => {
         "content-type": "application/json; charset=utf-8",
         "access-control-allow-origin": "*",
         "access-control-allow-headers": "authorization, content-type",
-        "access-control-allow-methods": "GET, POST, PUT",
+        "access-control-allow-methods": "GET, POST, PUT, DELETE",
       });
       return res.end(status === 204 ? "" : JSON.stringify(body));
     }

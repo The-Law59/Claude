@@ -83,6 +83,9 @@ export default function Season() {
               <Text style={s.time}>{x.points} pts</Text>
             </View>
           ))}
+          {season.mode === "live" && (
+            <Button label="⚔ Comparer deux pilotes" secondary onPress={() => router.push("/duel")} />
+          )}
         </View>
       )}
     </Screen>
