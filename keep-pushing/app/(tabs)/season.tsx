@@ -27,7 +27,7 @@ export default function Season() {
       {tab === "calendar" ? (
         <>
           <Text style={s.small}>
-            {season.events.length} Grands Prix · touchez un GP pour ses résultats
+            {season.events.length} Grands Prix · touchez un GP pour ses résultats, sa météo et sa fiche circuit
           </Text>
           {season.events.map((e) => {
             const race = e.sessions.at(-1)!;

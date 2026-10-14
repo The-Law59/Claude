@@ -39,6 +39,13 @@ export default function Home() {
         <Text style={s.heroText}>
           {next ? `${next.label} · ${formatDate(next.startsAt)}` : "Week-end terminé"}
         </Text>
+        {season.mode === "live" && (
+          <Button
+            label="🌦 Météo, horaires et fiche circuit →"
+            onPress={() => router.push(`/gp/${current.id}`)}
+            secondary
+          />
+        )}
         <Button
           label={lastRaceProtected ? "Gérer la protection" : "Voir la dernière course →"}
           onPress={() => router.navigate(lastRaceProtected ? "/settings" : "/live")}
@@ -56,8 +63,8 @@ export default function Home() {
       {prefs.protectedSessions.length > 0 && (
         <View style={s.lock}>
           <Text style={s.text}>
-            {prefs.protectedSessions.length} session(s) protégée(s). Les actualités
-            associées sont masquées.
+            {prefs.protectedSessions.length} session(s) protégée(s). Les actualités associées sont
+            masquées.
           </Text>
         </View>
       )}

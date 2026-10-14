@@ -17,6 +17,7 @@ export default function GrandPrix() {
   const [sessionId, setSessionId] = useState(event?.sessions.at(-1)!.id ?? "");
   type Weather = Awaited<ReturnType<typeof loadWeather>>;
   const [weather, setWeather] = useState<Weather | null>(null);
+  const [weatherError, setWeatherError] = useState(false);
   const [history, setHistory] = useState<{ season: string; driver: string; team: string }[]>([]);
   useEffect(() => {
     if (!event) return;
@@ -24,7 +25,7 @@ export default function GrandPrix() {
     if (event.location)
       loadWeather(event)
         .then(setWeather)
-        .catch(() => {});
+        .catch(() => setWeatherError(true));
     if (event.circuitId)
       loadCircuitHistory(event.circuitId)
         // L'édition de cette année est dans les résultats (et l'anti-spoil).
@@ -46,6 +47,10 @@ export default function GrandPrix() {
       </Screen>
     );
   const session = event.sessions.find((x) => x.id === sessionId) ?? event.sessions.at(-1)!;
+  const upcoming = event.sessions.some((x) => Date.parse(x.startsAt) > Date.now());
+  const forecast = event.sessions.filter(
+    (x) => weather?.bySession[x.id] && Date.parse(x.startsAt) > Date.now() - 3 * 3600000,
+  );
   return (
     <Screen>
       {back}
@@ -55,46 +60,45 @@ export default function GrandPrix() {
         {event.circuit}
         {event.location ? ` · ${event.location.locality}, ${event.location.country}` : ""}
       </Text>
-      <Toggle
-        label="Protéger ce week-end"
-        value={event.sessions.every((x) => prefs.protectedSessions.includes(x.id))}
-        onChange={(on) => setPrefs((p) => protectWeekend(p, event.sessions, on))}
-        detail="Masque résultats, vainqueur et actualités liées."
-      />
-      <Text style={s.small}>
-        Horaires de votre téléphone
-        {weather ? " · heure locale du circuit en dessous" : ""}
-      </Text>
-      {event.sessions.map((x) => (
-        <Pressable
-          key={x.id}
-          accessibilityRole="button"
-          accessibilityState={{ selected: x.id === session.id }}
-          onPress={() => setSessionId(x.id)}
-          style={[s.session, x.id === session.id && s.mine]}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={s.text}>{x.label}</Text>
-            <Text style={s.small}>{formatDate(x.startsAt)}</Text>
-            {weather && (
-              <Text style={s.small}>
-                Sur place : {localTime(x.startsAt, weather.timezone)}
-                {weather.bySession[x.id] &&
-                  `  ·  ${weather.bySession[x.id].icon} ${weather.bySession[x.id].temp}°C, pluie ${weather.bySession[x.id].rain} %`}
-              </Text>
-            )}
-          </View>
-          <Text style={s.link}>
-            {prefs.protectedSessions.includes(x.id)
-              ? "Protégée"
-              : Date.parse(x.startsAt) > Date.now()
-                ? "À venir"
-                : "Résultat"}
+      <Text style={s.heading}>Météo du week-end</Text>
+      <View style={s.card}>
+        {forecast.length > 0 ? (
+          forecast.map((x) => {
+            const w = weather!.bySession[x.id];
+            return (
+              <View key={x.id} style={s.rank}>
+                <Text style={{ fontSize: 26 }}>{w.icon}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.text}>{x.label}</Text>
+                  <Text style={s.small}>
+                    {w.label} · sur place {localTime(x.startsAt, weather!.timezone)}
+                  </Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={s.cardTitle}>{w.temp}°C</Text>
+                  <Text style={s.small}>pluie {w.rain} %</Text>
+                </View>
+              </View>
+            );
+          })
+        ) : (
+          <Text style={s.text}>
+            {weatherError
+              ? "Météo indisponible pour le moment."
+              : !weather
+                ? "Chargement de la météo…"
+                : upcoming
+                  ? "Les prévisions apparaissent 16 jours avant le week-end."
+                  : "Week-end terminé."}
           </Text>
-        </Pressable>
-      ))}
-      <Text style={s.heading}>{session.label}</Text>
-      <ResultRows sessionId={session.id} />
+        )}
+        {weather && (
+          <Text style={s.small}>
+            Heure locale du circuit : {localTime(new Date().toISOString(), weather.timezone)}{" "}
+            actuellement. Prévisions Open-Meteo.
+          </Text>
+        )}
+      </View>
       {history.length > 0 && (
         <>
           <Text style={s.heading}>Le circuit</Text>
@@ -113,11 +117,42 @@ export default function GrandPrix() {
           </View>
         </>
       )}
-      {weather && (
-        <Text style={s.small}>
-          Météo : prévisions Open-Meteo, disponibles jusqu’à 16 jours avant la session.
-        </Text>
-      )}
+      <Text style={s.heading}>Sessions</Text>
+      <Toggle
+        label="Protéger ce week-end"
+        value={event.sessions.every((x) => prefs.protectedSessions.includes(x.id))}
+        onChange={(on) => setPrefs((p) => protectWeekend(p, event.sessions, on))}
+        detail="Masque résultats, vainqueur et actualités liées."
+      />
+      <Text style={s.small}>Horaires de votre téléphone</Text>
+      {event.sessions.map((x) => (
+        <Pressable
+          key={x.id}
+          accessibilityRole="button"
+          accessibilityState={{ selected: x.id === session.id }}
+          onPress={() => setSessionId(x.id)}
+          style={[s.session, x.id === session.id && s.mine]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={s.text}>{x.label}</Text>
+            <Text style={s.small}>{formatDate(x.startsAt)}</Text>
+            {weather && (
+              <Text style={s.small}>
+                Heure locale du circuit : {localTime(x.startsAt, weather.timezone)}
+              </Text>
+            )}
+          </View>
+          <Text style={s.link}>
+            {prefs.protectedSessions.includes(x.id)
+              ? "Protégée"
+              : Date.parse(x.startsAt) > Date.now()
+                ? "À venir"
+                : "Résultat"}
+          </Text>
+        </Pressable>
+      ))}
+      <Text style={s.heading}>{session.label}</Text>
+      <ResultRows sessionId={session.id} />
     </Screen>
   );
 }
