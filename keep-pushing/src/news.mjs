@@ -1,4 +1,5 @@
 import { timedFetch } from "./jolpica.mjs";
+import { API_URL, hasApi } from "./api.mjs";
 
 // Veille actualités F1 : plusieurs flux publics, chaque article étiqueté selon
 // la fiabilité de sa source. On n'affiche que titre, extrait et lien d'origine.
@@ -206,9 +207,8 @@ export async function fetchFeeds(fetchFn = fetch) {
 
 // Avec un serveur (navigateur, ou EXPO_PUBLIC_API_URL sur mobile) : liste déjà
 // fusionnée et traduite en français par server.mjs. Sinon, flux lus directement.
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
 export async function loadNews(fetchFn = fetch) {
-  if (typeof document === "undefined" && !API_URL) return fetchFeeds(fetchFn);
+  if (!hasApi()) return fetchFeeds(fetchFn);
   const res = await timedFetch(fetchFn, `${API_URL}/api/news.json`, 60000);
   if (!res.ok) throw new Error(`Serveur ${res.status}`);
   return res.json();

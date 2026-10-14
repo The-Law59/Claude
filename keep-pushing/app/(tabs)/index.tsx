@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { articleVisible, protectWeekend } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
+import { RecapCard } from "../../src/components/RecapCard";
 import { Button, Pills, Screen, SourceBadge, formatDate, useTheme } from "../../src/ui";
 
 export default function Home() {
@@ -61,6 +62,7 @@ export default function Home() {
           </Text>
         </View>
       )}
+      <RecapCard event={last} />
       <Text style={s.heading}>Mon paddock</Text>
       {!myDriver && !myTeam ? (
         <View style={s.card}>

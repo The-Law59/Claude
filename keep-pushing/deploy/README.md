@@ -42,6 +42,12 @@ par l'API Claude si une clé est fournie. Sans clé, ils restent en anglais.
 
 Chaque article n'est traduit qu'une fois (cache conservé entre les mises à jour).
 
+Le même volume Docker garde aussi les récaps et les **pronostics** de vos groupes
+(`/app/data/predictions.json`). Pour une sauvegarde :
+```bash
+docker compose -f /opt/keep-pushing/keep-pushing/docker-compose.yml cp keep-pushing:/app/data ./sauvegarde-keep-pushing
+```
+
 ## 4. Sur le téléphone
 
 1. Même Wi-Fi que le serveur : ouvrir `http://<IP du conteneur>:3000`.

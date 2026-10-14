@@ -6,6 +6,7 @@ export const defaults = () => ({
   protectedSessions: [],
   revealed: [], // sessions marquées « vues » : l'anti-spoil auto ne les reprotège pas
   autoProtect: "off", // "off" | "race" | "weekend"
+  group: null, // pronostics : { groupId, memberId, token, name, code }
   frequency: "important",
   rumors: false,
   reminders: false,
@@ -29,6 +30,10 @@ export function restorePreferences(raw, sessions) {
         ? p.revealed.filter((x) => sessions.some((s) => s.id === x))
         : [],
       autoProtect: ["race", "weekend"].includes(p.autoProtect) ? p.autoProtect : "off",
+      group:
+        p.group && ["groupId", "memberId", "token", "name", "code"].every((k) => typeof p.group[k] === "string")
+          ? p.group
+          : null,
       myDriver: typeof p.myDriver === "string" ? p.myDriver : "",
       myTeam: typeof p.myTeam === "string" ? p.myTeam : "",
       frequency: p.frequency === "all" ? "all" : "important",
@@ -118,3 +123,13 @@ export function setMine(prefs, key, id) {
     favorites: id && !prefs.favorites.includes(id) ? [...prefs.favorites, id] : prefs.favorites,
   };
 }
+// Pronostics fermés au début de la première séance qualificative du week-end
+// (qualifs sprint comprises) : règle partagée par l'app et le serveur.
+export function lockTime(event) {
+  const quali = event.sessions.filter((s) =>
+    ["SprintQualifying", "Sprint", "Qualifying"].includes(s.type),
+  );
+  return Date.parse((quali[0] ?? event.sessions.at(-1)).startsAt);
+}
+// Récap disponible 3 h après le départ de la course (résultats publiés).
+export const recapReadyAt = (event) => Date.parse(event.sessions.at(-1).startsAt) + 3 * 3600000;

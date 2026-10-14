@@ -4,7 +4,7 @@ import { useTheme } from "../../src/ui";
 
 const tabs = [
   ["index", "⌂", "Accueil"],
-  ["live", "◉", "Course"],
+  ["pronos", "◎", "Pronos"],
   ["season", "▦", "Saison"],
   ["favorites", "♡", "Favoris"],
   ["settings", "☷", "Réglages"],
@@ -32,6 +32,8 @@ export default function TabsLayout() {
           }}
         />
       ))}
+      {/* Dernière course : ouverte depuis l'accueil, pas d'onglet dédié. */}
+      <Tabs.Screen name="live" options={{ href: null }} />
     </Tabs>
   );
 }
