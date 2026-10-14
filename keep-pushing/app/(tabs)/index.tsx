@@ -127,7 +127,12 @@ export default function Home() {
                 : "ACTUALITÉ · DÉMONSTRATION"}
           </Text>
           <Text style={s.cardTitle}>{a.title}</Text>
-          <Text style={s.small}>Lire le résumé →</Text>
+          {!!a.summary && (
+            <Text style={s.cardSummary} numberOfLines={3}>
+              {a.summary}
+            </Text>
+          )}
+          <Text style={s.small}>{a.link ? "Voir l’article →" : "Lire la suite →"}</Text>
         </Pressable>
       ))}
       {!visible.length && (

@@ -320,6 +320,7 @@ const makeStyles = (c: typeof base) =>
   pillActive: { backgroundColor: c.ink, borderColor: c.ink },
   pillTextActive: { color: "#fff", fontSize: 15 },
   card: { backgroundColor: c.card, borderRadius: 14, padding: 18, gap: 8 },
+  cardSummary: { fontSize: 14, lineHeight: 20, color: c.muted },
   cardTitle: { fontSize: 18, fontWeight: "600", lineHeight: 25, color: c.ink },
   label: {
     fontSize: 11,
