@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { api, hasApi } from "../../src/api.mjs";
-import { articleVisible, protectWeekend, teammateOf } from "../../src/model.mjs";
+import { articleVisible, askFeedback, protectWeekend, teammateOf } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
 import { Button, Pills, Screen, SourceBadge, formatDate, ordinal, useTheme } from "../../src/ui";
 
@@ -70,6 +70,21 @@ export default function Home() {
         </View>
       )}
       {season.mode === "live" && hasApi() && !!prefs.account && <MyBets eventId={current.id} />}
+      {hasApi() && !!prefs.account && askFeedback(prefs) && (
+        <View style={s.card}>
+          <Text style={s.label}>VOTRE AVIS COMPTE</Text>
+          <Text style={s.text}>
+            Vous utilisez Keep Pushing depuis quelques jours : qu’en pensez-vous ? 2 minutes pour
+            nous aider à l’améliorer.
+          </Text>
+          <Button label="💬 Donner mon avis" onPress={() => router.push("/feedback")} />
+          <Button
+            label="Plus tard"
+            secondary
+            onPress={() => setPrefs((p) => ({ ...p, feedbackAt: Date.now() }))}
+          />
+        </View>
+      )}
       <Text style={s.heading}>Mon paddock</Text>
       {!myDriver && !myTeam ? (
         <View style={s.card}>

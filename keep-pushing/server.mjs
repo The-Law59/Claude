@@ -14,6 +14,7 @@ import * as accounts from "./src/accounts.mjs";
 import * as bets from "./src/bets.mjs";
 import * as leagues from "./src/leagues.mjs";
 import * as seasons from "./src/seasons.mjs";
+import * as community from "./src/community.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
 const DATA = join(import.meta.dirname, "data");
@@ -116,6 +117,8 @@ const save = () =>
     .then(() => writeFile(GAME, JSON.stringify(state)))
     .catch((e) => console.warn(`Jeu non sauvegardé : ${e.message}`)));
 state.final ??= {};
+// Pseudos admins (avis, modération du forum) : ADMINS=Quentin,Lucas dans .env.
+const ADMINS = community.parseAdmins(process.env.ADMINS);
 state.champions ??= {};
 
 // Copie quotidienne de game.json dans data/backups/, 14 jours gardés.
@@ -324,7 +327,61 @@ async function api(req, path) {
     accounts.logout(state, req.headers.authorization);
     return [200, await changed({})];
   }
-  if (path === "/api/me") return [200, accounts.friendsView(state, auth())];
+  if (path === "/api/me") {
+    const user = auth();
+    return [200, { ...accounts.friendsView(state, user), admin: community.isAdmin(user, ADMINS) }];
+  }
+  // --- Avis et forum.
+  if (path === "/api/feedback") {
+    const user = auth();
+    if (req.method === "POST") {
+      community.submitFeedback(state, user, await readJson(req));
+      await save();
+      return [201, { ok: true }];
+    }
+    if (!community.isAdmin(user, ADMINS)) return [403, { error: "Réservé aux admins." }];
+    return [200, community.feedbackSummary(state)];
+  }
+  if (path === "/api/forum") {
+    const user = auth();
+    if (req.method === "POST") {
+      const t = community.createTopic(state, user, await readJson(req), {
+        eventIds: (season?.events ?? []).map((e) => e.id),
+      });
+      await save();
+      return [201, { id: t.id }];
+    }
+    const category = new URL(req.url, "http://x").searchParams.get("category");
+    return [
+      200,
+      {
+        topics: community.listTopics(state, user, category),
+        admin: community.isAdmin(user, ADMINS),
+        reported: community.isAdmin(user, ADMINS) ? community.reported(state) : [],
+      },
+    ];
+  }
+  if (path === "/api/forum/block" && req.method === "POST") {
+    const user = auth();
+    community.block(user, (await readJson(req)).userId);
+    return [200, await changed({ ok: true })];
+  }
+  const topic = path.match(/^\/api\/forum\/([\w-]+)(?:\/([\w-]+)(\/report)?)?$/);
+  if (topic) {
+    const user = auth();
+    const admin = community.isAdmin(user, ADMINS);
+    const [, topicId, postId, isReport] = topic;
+    if (req.method === "POST" && !postId)
+      community.reply(state, user, topicId, await readJson(req));
+    if (req.method === "POST" && isReport) community.report(state, user, topicId, postId);
+    if (req.method === "DELETE" && postId) {
+      community.deletePost(state, user, topicId, postId, admin);
+      await save();
+      if (!state.forum.topics[topicId]) return [200, { deleted: true }];
+    }
+    if (req.method === "POST") await save();
+    return [200, community.topicView(state, user, topicId, admin)];
+  }
   if (path === "/api/friends" && req.method === "POST") {
     const user = auth();
     accounts.addFriend(state, user, (await readJson(req)).pseudo);

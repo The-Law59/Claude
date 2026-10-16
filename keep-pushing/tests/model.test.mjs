@@ -18,6 +18,7 @@ import {
   syncedPart,
   SYNCED,
   teamDuel,
+  askFeedback,
 } from "../src/model.mjs";
 test("Une session protégée masque son article même dans toute la F1", () => {
   const p = setProtected(defaults(), RACE, true);
@@ -238,4 +239,13 @@ test("Duel d'écuries : GP gagnés aux points, podiums, meilleure place", () => 
   assert.deepEqual(d.podiums, [1, 2]);
   assert.deepEqual(d.best, [1, 1]);
   assert.equal(d.rounds.length, 2);
+});
+
+test("Rappel d'avis : après 3 jours, puis au plus une fois par mois", () => {
+  const D = 86400000;
+  assert.equal(askFeedback({ firstSeen: 0, feedbackAt: 0 }, 10 * D), false);
+  assert.equal(askFeedback({ firstSeen: 1, feedbackAt: 0 }, 2 * D), false);
+  assert.equal(askFeedback({ firstSeen: 1, feedbackAt: 0 }, 4 * D), true);
+  assert.equal(askFeedback({ firstSeen: 1, feedbackAt: 4 * D }, 20 * D), false);
+  assert.equal(askFeedback({ firstSeen: 1, feedbackAt: 4 * D }, 40 * D), true);
 });

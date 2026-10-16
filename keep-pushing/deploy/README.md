@@ -40,6 +40,12 @@ par l'API Claude si une clé est fournie. Sans clé, ils restent en anglais.
    (remplacer `sk-ant-...` par votre clé ; ne la partagez jamais ailleurs).
 3. Relancer la commande d'installation pour redémarrer l'app.
 
+Admins (lecture des avis, modération du forum) : ajoutez leurs pseudos dans
+le même fichier `.env`, séparés par des virgules, puis relancez l'installation :
+```bash
+echo 'ADMINS=Quentin' >> /opt/keep-pushing/keep-pushing/.env
+```
+
 Chaque article n'est traduit qu'une fois (cache conservé entre les mises à jour).
 
 Le même volume Docker garde aussi les **comptes, amis et paris**

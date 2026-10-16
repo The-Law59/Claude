@@ -27,6 +27,8 @@ export type Prefs = {
   syncedAt: number;
   betReminders: boolean;
   theme: "auto" | "light" | "dark";
+  firstSeen: number;
+  feedbackAt: number;
   frequency: string;
   rumors: boolean;
   reminders: boolean;
@@ -134,6 +136,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       .then(() => AsyncStorage.setItem(KEY, JSON.stringify(prefs)))
       .catch(() => setError("Vos choix n’ont pas pu être enregistrés."));
   }, [prefs, ready]);
+  useEffect(() => {
+    if (ready && !prefs.firstSeen) setPrefs((p) => ({ ...p, firstSeen: Date.now() }));
+  }, [ready]);
   // Anti-spoil automatique : au démarrage puis chaque minute.
   useEffect(() => {
     if (!ready) return;

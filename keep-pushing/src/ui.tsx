@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   Pressable,
   ScrollView,
@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
+import { api } from "./api.mjs";
 import { articleVisible, setProtected } from "./model.mjs";
 import { DEFAULT_ACCENT, accentFor, mix, readableOn, tint } from "./teams.mjs";
 import { useStore } from "./store";
@@ -479,3 +480,19 @@ export function RelatedNews({ tags }: { tags: string[] }) {
 
 // 1er, 2e, 3e…
 export const ordinal = (n: number) => (n === 1 ? "1er" : `${n}e`);
+
+// Appel authentifié ; une session expirée déconnecte l'appareil.
+export function useCall() {
+  const { prefs, update } = useStore();
+  return useCallback(
+    async (path: string, options: { method?: string; body?: unknown } = {}) => {
+      try {
+        return await api(path, { ...options, token: prefs.account?.token });
+      } catch (e) {
+        if ((e as { status?: number }).status === 401) update({ account: null });
+        throw e;
+      }
+    },
+    [prefs.account?.token],
+  );
+}

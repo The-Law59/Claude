@@ -7,6 +7,7 @@ import { useTheme } from "../../src/ui";
 const tabs = [
   ["index", "⌂", "Accueil"],
   ["pronos", "◎", "Pronos"],
+  ["forum", "❝", "Forum"],
   ["season", "▦", "Saison"],
   ["favorites", "♡", "Favoris"],
   ["settings", "☷", "Réglages"],

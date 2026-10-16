@@ -6,6 +6,7 @@ services:
     environment:
       # Clé lue depuis le fichier .env à côté de ce fichier (jamais commité).
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ADMINS: ${ADMINS:-}
     volumes:
       - translations:/app/data
     restart: unless-stopped

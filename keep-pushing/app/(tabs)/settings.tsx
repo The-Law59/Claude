@@ -38,6 +38,7 @@ export default function Settings() {
   return (
     <Screen>
       <Text style={s.title}>À votre rythme.</Text>
+      <Button label="💬 Donner mon avis sur l’appli" onPress={() => router.push("/feedback")} />
       {hasApi() && (
         <>
           <Text style={s.heading}>Compte</Text>

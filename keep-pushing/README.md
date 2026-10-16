@@ -45,6 +45,9 @@ Les rappels locaux sont réservés au téléphone.
 - Onglet Pronos → Palmarès : pronos des champions pilote (50 pts) et constructeur (30 pts), ouverts jusqu’au 6e GP avant la fin ; podium animé de la saison (provisoire puis final), leader de chaque ligue, saisons passées. Les points des week-ends terminés sont figés dans `data/game.json` (`final`).
 - Duel d’écuries (Saison → Écuries, ou page d’une écurie) : GP gagnés aux points, points, podiums, meilleure place, GP par GP.
 - Sauvegarde automatique : copie quotidienne de `data/game.json` dans `data/backups/` (14 jours gardés).
+- Forum (onglet Forum, `src/community.mjs`) : sujets par catégorie (réglementation, week-ends de course, pronos et ligues, divers), réponses, rythme limité ; signaler un message, masquer un joueur, l’auteur efface ses messages ; les admins voient les signalements et suppriment. Un sujet de week-end est rattaché à son GP et masqué à ceux qui le protègent par l’anti-spoil.
+- Avis (Réglages → « Donner mon avis », et rappel sur l’accueil après 3 jours puis au plus une fois par mois) : note sur 5, fonctionnalités préférées, points à améliorer, idées ; un avis par jour et par joueur. Les admins voient la synthèse (moyenne, ce qui plaît le plus, derniers avis) sur le même écran.
+- Admins : pseudos listés dans la variable `ADMINS` du serveur.
 - Mon pilote et mon écurie (★) : l’app prend la couleur de l’écurie choisie (`src/teams.mjs`, contraste vérifié par les tests), carte « Mon paddock » sur l’accueil (classement, points, dernier résultat), mis en avant dans les classements. Autres favoris pour filtrer les actualités. Réglages enregistrés sur l’appareil, sans compte.
 - Rappels locaux neutres à 10, 30 ou 60 minutes pour les sessions du prochain Grand Prix.
 

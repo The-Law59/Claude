@@ -13,6 +13,7 @@ import {
   Toggle,
   formatDate,
   ordinal,
+  useCall,
   useTheme,
 } from "../../src/ui";
 
@@ -79,22 +80,6 @@ type Person = { id: string; pseudo: string };
 type Friends = { me: Person; friends: Person[]; incoming: Person[]; outgoing: Person[] };
 
 const LABELS: Record<Part, string> = { quali: "Qualifications", sprint: "Sprint", race: "Course" };
-
-// Appel authentifié ; une session expirée déconnecte l'appareil.
-function useCall() {
-  const { prefs, update } = useStore();
-  return useCallback(
-    async (path: string, options: { method?: string; body?: unknown } = {}) => {
-      try {
-        return await api(path, { ...options, token: prefs.account?.token });
-      } catch (e) {
-        if ((e as { status?: number }).status === 401) update({ account: null });
-        throw e;
-      }
-    },
-    [prefs.account?.token],
-  );
-}
 
 export default function Pronos() {
   const { s } = useTheme();

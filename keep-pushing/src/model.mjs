@@ -11,6 +11,8 @@ export const defaults = () => ({
   syncedAt: 0, // date des réglages reçus du compte
   betReminders: false, // rappel 1 h avant la fermeture des paris
   theme: "auto", // "auto" | "light" | "dark"
+  firstSeen: 0, // premier lancement (rappel « donnez votre avis »)
+  feedbackAt: 0, // dernier avis donné ou rappel refusé
   frequency: "important",
   rumors: false,
   reminders: false,
@@ -42,6 +44,8 @@ export function restorePreferences(raw, sessions) {
       syncedAt: Number.isFinite(p.syncedAt) ? p.syncedAt : 0,
       betReminders: p.betReminders === true,
       theme: ["light", "dark"].includes(p.theme) ? p.theme : "auto",
+      firstSeen: Number.isFinite(p.firstSeen) ? p.firstSeen : 0,
+      feedbackAt: Number.isFinite(p.feedbackAt) ? p.feedbackAt : 0,
       myDriver: typeof p.myDriver === "string" ? p.myDriver : "",
       myTeam: typeof p.myTeam === "string" ? p.myTeam : "",
       frequency: p.frequency === "all" ? "all" : "important",
@@ -219,3 +223,10 @@ export function teamDuel(a, b) {
     best: [best(a), best(b)],
   };
 }
+
+// Rappel « donnez votre avis » : après 3 jours d'utilisation, puis au plus
+// une fois par mois (avis donné ou rappel refusé).
+export const askFeedback = (prefs, now = Date.now()) =>
+  !!prefs.firstSeen &&
+  now - prefs.firstSeen > 3 * 86400000 &&
+  (!prefs.feedbackAt || now - prefs.feedbackAt > 30 * 86400000);
