@@ -117,6 +117,11 @@ export default function Team() {
           )}
         </>
       )}
+      <Button
+        label="⚔ Comparer avec une autre écurie"
+        secondary
+        onPress={() => router.push(`/teams-duel?a=${team.id}`)}
+      />
       {prefs.myTeam !== team.id && (
         <Button
           label="★ En faire mon écurie"

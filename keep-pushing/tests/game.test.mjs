@@ -5,7 +5,8 @@ import {
   mergeBet, scoreBet, scoreList, visibleBet, leaderboard, partsOf, perRound, history,
   questionOf, answerOf, closesAt, POINTS,
 } from "../src/bets.mjs";
-import { createLeague, joinLeague, leaveLeague, leaguesOf } from "../src/leagues.mjs";
+import { createLeague, joinLeague, leaveLeague, leaguesOf, postMessage, deleteMessage, messagesOf } from "../src/leagues.mjs";
+import { championsCloseAt, mergeChampions, scoreChampions, standingsBySeason, backupName, backupsToDelete } from "../src/seasons.mjs";
 
 const fresh = () => ({ users: {}, sessions: {}, bets: {} });
 const rejects = (p, status) => assert.rejects(p, (e) => e.status === status);
@@ -186,4 +187,48 @@ test("Ligues privées : création, code, adhésion, départ", () => {
   assert.deepEqual(leaguesOf(state, a), []);
   leaveLeague(state, b, l.id);
   assert.deepEqual(state.leagues, {}); // vide : supprimée
+});
+
+test("Chat de ligue : membres seulement, rythme limité, modération", () => {
+  const state = { leagues: {}, users: { a: { pseudo: "Quentin" }, b: { pseudo: "Lucas" }, c: { pseudo: "Max" } } };
+  const [a, b, c] = ["a", "b", "c"].map((id) => ({ id }));
+  const l = createLeague(state, a, { name: "Tifosi" });
+  joinLeague(state, b, { code: l.code });
+  postMessage(state, b, l.id, { text: "  Hülkenberg   vainqueur ? 😂 " }, { now: 1000 });
+  throws(() => postMessage(state, b, l.id, { text: "encore" }, { now: 2000 }), 429);
+  throws(() => postMessage(state, c, l.id, { text: "intrus" }, { now: 5000 }), 404);
+  throws(() => postMessage(state, a, l.id, { text: "x".repeat(281) }, { now: 5000 }), 400);
+  postMessage(state, a, l.id, { text: "Allez Ferrari" }, { now: 5000 });
+  const view = messagesOf(state, b, l.id);
+  assert.deepEqual(view.messages.map((m) => [m.pseudo, m.text, m.mine]), [
+    ["Lucas", "Hülkenberg vainqueur ? 😂", true],
+    ["Quentin", "Allez Ferrari", false],
+  ]);
+  throws(() => deleteMessage(state, b, l.id, view.messages[1].id), 403); // pas son message
+  deleteMessage(state, a, l.id, view.messages[0].id); // le créateur modère
+  assert.equal(messagesOf(state, a, l.id).messages.length, 1);
+});
+
+test("Pronos des champions : fermeture, validation, points", () => {
+  const ev = (d) => ({ sessions: [{ startsAt: `2026-${d}T10:00:00Z` }] });
+  const events = ["03-01", "04-01", "05-01", "06-01", "07-01", "08-01", "09-01", "10-01"].map(ev);
+  const closes = championsCloseAt(events);
+  assert.equal(closes, Date.parse("2026-05-01T10:00:00Z")); // 6e GP avant la fin
+  const opts = { driverIds: ["d1", "d2"], teamIds: ["t1"], closes, now: closes - 1 };
+  const bet = mergeChampions({}, { driver: "d1", team: "t1" }, opts);
+  throws(() => mergeChampions(bet, { driver: "inconnu" }, opts), 400);
+  throws(() => mergeChampions(bet, { driver: "d2" }, { ...opts, now: closes }), 409);
+  assert.equal(scoreChampions(bet, { driver: "d1", team: "t1" }), 80);
+  assert.equal(scoreChampions(bet, { driver: "d2", team: "t1" }), 30);
+});
+
+test("Palmarès par saison et rotation des sauvegardes", () => {
+  const rounds = { "f1-2025-24": { a: 10, b: 30 }, "f1-2026-1": { a: 50 }, "champions-2026": { b: 80 } };
+  assert.deepEqual(standingsBySeason(rounds), {
+    2025: [{ id: "b", points: 30 }, { id: "a", points: 10 }],
+    2026: [{ id: "b", points: 80 }, { id: "a", points: 50 }],
+  });
+  assert.equal(backupName(new Date("2026-10-16T08:00:00Z")), "game-2026-10-16.json");
+  const names = Array.from({ length: 16 }, (_, i) => `game-2026-10-${String(i + 1).padStart(2, "0")}.json`);
+  assert.deepEqual(backupsToDelete([...names, "autre.txt"]), ["game-2026-10-01.json", "game-2026-10-02.json"]);
 });

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import { api, hasApi } from "../../src/api.mjs";
 import { articleVisible, protectWeekend, teammateOf } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
-import { Button, Pills, Screen, SourceBadge, formatDate, useTheme } from "../../src/ui";
+import { Button, Pills, Screen, SourceBadge, formatDate, ordinal, useTheme } from "../../src/ui";
 
 export default function Home() {
   const { s } = useTheme();
@@ -68,6 +69,7 @@ export default function Home() {
           </Text>
         </View>
       )}
+      {season.mode === "live" && hasApi() && !!prefs.account && <MyBets eventId={current.id} />}
       <Text style={s.heading}>Mon paddock</Text>
       {!myDriver && !myTeam ? (
         <View style={s.card}>
@@ -87,7 +89,7 @@ export default function Home() {
                 <Text style={s.cardTitle}>{myDriver.name} ★</Text>
                 <Text style={s.small}>
                   {myDriver.team}
-                  {lastResult ? ` · ${lastResult.position}e à ${last.name}` : ""}
+                  {lastResult ? ` · ${ordinal(lastResult.position)} à ${last.name}` : ""}
                 </Text>
               </View>
               <Text style={s.time}>{myDriver.points} pts</Text>
@@ -177,5 +179,60 @@ export default function Home() {
         </View>
       )}
     </Screen>
+  );
+}
+
+// Ce qu'il manque à mes paris du prochain GP, avec la prochaine fermeture.
+const TODO: Record<string, string> = {
+  quali: "top 10 des qualifs",
+  sprint: "top 8 du sprint",
+  race: "top 10 de la course",
+  fastest: "meilleur tour",
+  dnf: "abandons",
+  answer: "question du week-end",
+};
+function MyBets({ eventId }: { eventId: string }) {
+  const { s, c } = useTheme();
+  const { prefs } = useStore();
+  const router = useRouter();
+  const [view, setView] = useState<{
+    closes: Record<string, number>;
+    parts: string[];
+    mine: Record<string, unknown> | null;
+  } | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      api(`/api/bets/${eventId}`, { token: prefs.account?.token })
+        .then(setView)
+        .catch(() => setView(null));
+    }, [eventId, prefs.account?.token]),
+  );
+  if (!view) return null;
+  const now = Date.now();
+  const open = [...view.parts, "fastest", "dnf", "answer"].filter((k) => now < view.closes[k]);
+  if (!open.length) return null;
+  const missing = open.filter((k) => view.mine?.[k] === undefined);
+  const nextClose = Math.min(...(missing.length ? missing : open).map((k) => view.closes[k]));
+  const hours = Math.max(0, Math.round((nextClose - now) / 3600000));
+  const when = hours < 48 ? `dans ${hours} h` : `le ${formatDate(nextClose)}`;
+  return (
+    <View style={[s.card, missing.length > 0 && { borderWidth: 2, borderColor: c.accent }]}>
+      <Text style={s.label}>MES PRONOS</Text>
+      {missing.length ? (
+        <>
+          <Text style={s.cardTitle}>
+            Il vous manque : {missing.map((k) => TODO[k]).join(", ")}.
+          </Text>
+          <Text style={s.small}>Prochaine fermeture {when}.</Text>
+          <Button label="Compléter mes pronos →" onPress={() => router.navigate("/pronos")} />
+        </>
+      ) : (
+        <>
+          <Text style={s.cardTitle}>✓ Tous vos paris sont prêts.</Text>
+          <Text style={s.small}>Modifiables jusqu’à la fermeture, {when}.</Text>
+          <Button label="Revoir mes pronos" secondary onPress={() => router.navigate("/pronos")} />
+        </>
+      )}
+    </View>
   );
 }

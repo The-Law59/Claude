@@ -4,7 +4,7 @@
 //   ANTHROPIC_API_KEY est défini (les navigateurs ne peuvent pas lire les flux) ;
 // - /api/… comptes, amis et paris (data/game.json).
 import { createServer } from "node:http";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { copyFile, readFile, readdir, rm, writeFile, mkdir } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { fetchFeeds } from "./src/news.mjs";
@@ -13,6 +13,7 @@ import { createTranslator } from "./src/translate.mjs";
 import * as accounts from "./src/accounts.mjs";
 import * as bets from "./src/bets.mjs";
 import * as leagues from "./src/leagues.mjs";
+import * as seasons from "./src/seasons.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
 const DATA = join(import.meta.dirname, "data");
@@ -114,6 +115,23 @@ const save = () =>
     .then(() => mkdir(DATA, { recursive: true }))
     .then(() => writeFile(GAME, JSON.stringify(state)))
     .catch((e) => console.warn(`Jeu non sauvegardé : ${e.message}`)));
+state.final ??= {};
+state.champions ??= {};
+
+// Copie quotidienne de game.json dans data/backups/, 14 jours gardés.
+const BACKUPS = join(DATA, "backups");
+async function backup() {
+  try {
+    await saving;
+    await mkdir(BACKUPS, { recursive: true });
+    await copyFile(GAME, join(BACKUPS, seasons.backupName(new Date()))).catch(() => {});
+    for (const old of seasons.backupsToDelete(await readdir(BACKUPS))) await rm(join(BACKUPS, old));
+  } catch (e) {
+    console.warn(`Sauvegarde : ${e.message}`);
+  }
+}
+backup();
+setInterval(backup, 24 * 3600 * 1000);
 
 async function betView(event, user) {
   const results = await roundResults(event).catch(() => ({}));
@@ -159,17 +177,55 @@ async function betView(event, user) {
 const jokerEvent = (user, event) =>
   season?.events.find((e) => e.id !== event.id && state.bets[e.id]?.[user.id]?.joker);
 
-async function rankings(user) {
+const seasonId = () => season?.events[0]?.season;
+const seasonDone = () => !!season && !!rounds.get(season.events.at(-1).id)?.final;
+// Champions réels une fois la dernière course publiée (classements à jour).
+const champions = () =>
+  seasonDone() && {
+    driver: [...season.drivers].sort((a, b) => b.points - a.points)[0]?.id,
+    team: [...season.teams].sort((a, b) => b.points - a.points)[0]?.id,
+  };
+
+// Points de toutes les manches : week-ends en cours calculés, week-ends
+// terminés figés dans state.final (anciennes saisons comprises), plus les
+// pronos des champions en fin de saison.
+async function allRounds() {
   await Promise.all(
     Object.keys(state.bets)
       .map(findEvent)
       .filter(Boolean)
       .map((e) => roundResults(e).catch(() => ({}))),
   );
-  const rounds = bets.perRound(state.bets, bySession);
+  const live = bets.perRound(state.bets, bySession);
+  let changed = false;
+  for (const [id, byUser] of Object.entries(live))
+    if (rounds.get(id)?.final && JSON.stringify(state.final[id]) !== JSON.stringify(byUser)) {
+      state.final[id] = byUser;
+      changed = true;
+    }
+  if (changed) save();
+  const champ = champions();
+  const extra = champ
+    ? {
+        [seasons.championsKey(seasonId())]: Object.fromEntries(
+          Object.entries(state.champions[seasonId()] ?? {}).map(([uid, b]) => [
+            uid,
+            seasons.scoreChampions(b, champ),
+          ]),
+        ),
+      }
+    : {};
+  return { ...state.final, ...live, ...extra };
+}
+
+async function rankings(user) {
+  const all = await allRounds();
+  const current = Object.fromEntries(
+    Object.entries(all).filter(([key]) => seasons.seasonOf(key) === seasonId()),
+  );
   const rank = (ids) =>
     bets
-      .leaderboard(ids, rounds)
+      .leaderboard(ids, current)
       .sort(
         (a, b) =>
           b.points - a.points || state.users[a.id].pseudo.localeCompare(state.users[b.id].pseudo),
@@ -197,7 +253,7 @@ async function rankings(user) {
     history: bets
       .history(
         Object.keys(state.users),
-        rounds,
+        current,
         (season?.events ?? []).map((e) => e.id),
         user.id,
       )
@@ -206,7 +262,38 @@ async function rankings(user) {
         name: findEvent(h.eventId)?.name ?? h.eventId,
         best: { pseudo: state.users[h.best.id]?.pseudo ?? "—", points: h.best.points },
       })),
+    palmares: palmares(user, all),
   };
+}
+
+// Palmarès : podium de chaque saison (en cours = provisoire), ma place, et
+// le leader de chacune de mes ligues.
+function palmares(user, all) {
+  const pseudo = (id) => state.users[id]?.pseudo ?? "Ancien joueur";
+  const mine = leagues.leaguesOf(state, user);
+  return Object.entries(seasons.standingsBySeason(all))
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([s, rows]) => {
+      const inLeague = (l) => rows.filter((r) => l.members.includes(r.id));
+      return {
+        season: s,
+        done: s !== seasonId() || seasonDone(),
+        left:
+          s === seasonId()
+            ? season.events.filter((e) => Date.parse(e.sessions.at(-1).startsAt) > Date.now())
+                .length
+            : 0,
+        podium: rows
+          .slice(0, 3)
+          .map((r) => ({ pseudo: pseudo(r.id), points: r.points, me: r.id === user.id })),
+        myRank: rows.findIndex((r) => r.id === user.id) + 1 || null,
+        players: rows.length,
+        leagues: mine
+          .map((l) => ({ name: l.name, leader: inLeague(l)[0] }))
+          .filter((l) => l.leader)
+          .map((l) => ({ name: l.name, pseudo: pseudo(l.leader.id), points: l.leader.points })),
+      };
+    });
 }
 
 async function readJson(req) {
@@ -259,6 +346,53 @@ async function api(req, path) {
     const user = auth();
     leagues.joinLeague(state, user, await readJson(req));
     return [200, await changed(await rankings(user))];
+  }
+  const chat = path.match(/^\/api\/leagues\/([\w-]+)\/messages(?:\/([\w-]+))?$/);
+  if (chat) {
+    const user = auth();
+    if (req.method === "POST") leagues.postMessage(state, user, chat[1], await readJson(req));
+    if (req.method === "DELETE" && chat[2]) leagues.deleteMessage(state, user, chat[1], chat[2]);
+    if (req.method !== "GET") await save();
+    return [200, leagues.messagesOf(state, user, chat[1])];
+  }
+  if (path === "/api/champions") {
+    const user = auth();
+    const id = seasonId();
+    if (!id) return [503, { error: "Saison indisponible." }];
+    const closes = seasons.championsCloseAt(season.events);
+    state.champions[id] ??= {};
+    if (req.method === "PUT") {
+      state.champions[id][user.id] = seasons.mergeChampions(
+        state.champions[id][user.id],
+        await readJson(req),
+        {
+          driverIds: season.drivers.map((d) => d.id),
+          teamIds: season.teams.map((t) => t.id),
+          closes,
+        },
+      );
+      await save();
+    }
+    const mine = state.champions[id][user.id] ?? null;
+    const champ = champions();
+    return [
+      200,
+      {
+        season: id,
+        closes,
+        mine,
+        champions: champ || null,
+        points: champ && mine ? seasons.scoreChampions(mine, champ) : null,
+        // Paris des amis visibles une fois fermés.
+        friends:
+          Date.now() >= closes
+            ? accounts
+                .friendIds(state, user)
+                .filter((f) => state.champions[id][f])
+                .map((f) => ({ pseudo: state.users[f].pseudo, ...state.champions[id][f] }))
+            : [],
+      },
+    ];
   }
   const league = path.match(/^\/api\/leagues\/([\w-]+)$/);
   if (league && req.method === "DELETE") {

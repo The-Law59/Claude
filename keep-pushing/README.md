@@ -40,6 +40,11 @@ Les rappels locaux sont réservés au téléphone.
 - Simulateur de championnat (Saison → Pilotes) : courses et sprints restants, pilotes encore en lice, places à choisir, classement final recalculé.
 - Page GP : météo par session (Open-Meteo, jusqu’à 16 jours avant), heure locale du circuit, derniers vainqueurs du circuit.
 - Mode sombre (Réglages → Affichage : comme le téléphone, clair ou sombre) ; couleurs d’écurie éclaircies automatiquement pour rester lisibles (contraste ≥ 4,5:1 testé).
+- Accueil : carte « Mes pronos » (ce qu’il manque pour le prochain GP et la prochaine fermeture).
+- Ligues : discussion par ligue (280 caractères, réactions rapides, un message toutes les 3 s, 200 derniers gardés ; l’auteur ou le créateur efface ; masquée si une session est protégée).
+- Onglet Pronos → Palmarès : pronos des champions pilote (50 pts) et constructeur (30 pts), ouverts jusqu’au 6e GP avant la fin ; podium animé de la saison (provisoire puis final), leader de chaque ligue, saisons passées. Les points des week-ends terminés sont figés dans `data/game.json` (`final`).
+- Duel d’écuries (Saison → Écuries, ou page d’une écurie) : GP gagnés aux points, points, podiums, meilleure place, GP par GP.
+- Sauvegarde automatique : copie quotidienne de `data/game.json` dans `data/backups/` (14 jours gardés).
 - Mon pilote et mon écurie (★) : l’app prend la couleur de l’écurie choisie (`src/teams.mjs`, contraste vérifié par les tests), carte « Mon paddock » sur l’accueil (classement, points, dernier résultat), mis en avant dans les classements. Autres favoris pour filtrer les actualités. Réglages enregistrés sur l’appareil, sans compte.
 - Rappels locaux neutres à 10, 30 ou 60 minutes pour les sessions du prochain Grand Prix.
 

@@ -17,6 +17,7 @@ import {
   applySynced,
   syncedPart,
   SYNCED,
+  teamDuel,
 } from "../src/model.mjs";
 test("Une session protégée masque son article même dans toute la F1", () => {
   const p = setProtected(defaults(), RACE, true);
@@ -228,4 +229,13 @@ test("Réglages synchronisés : seulement les clés partagées, validées", () =
   assert.equal(next.account.pseudo, "Q");
   assert.equal(next.syncedAt, 42);
   assert.deepEqual(Object.keys(syncedPart(next)).sort(), [...SYNCED].sort());
+});
+
+test("Duel d'écuries : GP gagnés aux points, podiums, meilleure place", () => {
+  const r = (round, points, best) => ({ round, name: `GP${round}`, points, best });
+  const d = teamDuel([r(1, 30, 1), r(2, 4, 8), r(3, 10, 5)], [r(1, 12, 4), r(2, 18, 2), r(4, 25, 1)]);
+  assert.deepEqual(d.ahead, [1, 1]); // GP3 absent chez l'autre : ignoré
+  assert.deepEqual(d.podiums, [1, 2]);
+  assert.deepEqual(d.best, [1, 1]);
+  assert.equal(d.rounds.length, 2);
 });

@@ -51,3 +51,48 @@ export function leaveLeague(state, user, id) {
 }
 
 export const leaguesOf = mine;
+
+// --- Chat de la ligue : 280 caractères, un message toutes les 3 s, les
+// 200 derniers gardés. On efface ses messages ; le créateur modère.
+const CHAT = { length: 280, keep: 200, gapMs: 3000 };
+
+function member(state, user, id) {
+  const league = state.leagues?.[id];
+  if (!league?.members.includes(user.id)) fail(404, "Ligue inconnue.");
+  return league;
+}
+
+export function postMessage(state, user, id, body, { now = Date.now(), rand = randomBytes } = {}) {
+  const league = member(state, user, id);
+  const text = typeof body?.text === "string" ? body.text.trim().replace(/\s+/g, " ") : "";
+  if (!text || text.length > CHAT.length) fail(400, `Message : 1 à ${CHAT.length} caractères.`);
+  league.messages ??= [];
+  const last = league.messages.findLast((m) => m.userId === user.id);
+  if (last && now - last.at < CHAT.gapMs)
+    fail(429, "Doucement : un message toutes les 3 secondes.");
+  league.messages.push({ id: rand(6).toString("base64url"), userId: user.id, text, at: now });
+  league.messages = league.messages.slice(-CHAT.keep);
+}
+
+export function deleteMessage(state, user, id, messageId) {
+  const league = member(state, user, id);
+  const m = (league.messages ?? []).find((x) => x.id === messageId);
+  if (!m) fail(404, "Message introuvable.");
+  if (m.userId !== user.id && league.owner !== user.id)
+    fail(403, "Seul l'auteur ou le créateur peut l'effacer.");
+  league.messages = league.messages.filter((x) => x.id !== messageId);
+}
+
+export function messagesOf(state, user, id) {
+  const league = member(state, user, id);
+  return {
+    owner: league.owner === user.id,
+    messages: (league.messages ?? []).map((m) => ({
+      id: m.id,
+      pseudo: state.users?.[m.userId]?.pseudo ?? "Ancien membre",
+      mine: m.userId === user.id,
+      text: m.text,
+      at: m.at,
+    })),
+  };
+}

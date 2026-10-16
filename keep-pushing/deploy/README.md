@@ -52,6 +52,17 @@ Météo : les téléphones interrogent directement Open-Meteo (gratuit, sans cl�
 pour un usage non commercial ; une version payante est nécessaire si l'app
 devient commerciale).
 
+Sauvegardes : le serveur copie chaque jour `game.json` dans
+`/app/data/backups/` (14 jours gardés). Pour se protéger aussi d'une panne du
+conteneur, activez une sauvegarde planifiée du LXC dans Proxmox
+(Datacenter → Sauvegarde → Ajouter). Pour restaurer une copie :
+```bash
+cd /opt/keep-pushing/keep-pushing
+docker compose stop
+docker compose run --rm keep-pushing cp data/backups/game-AAAA-MM-JJ.json data/game.json
+docker compose start
+```
+
 Mot de passe oublié par un joueur : l'app s'arrête une minute, le temps de
 lui en générer un nouveau (affiché à l'écran, à lui transmettre) :
 ```bash

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Animated, Pressable, Text, TextInput, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { api, hasApi } from "../../src/api.mjs";
 import { PARTS, POINTS } from "../../src/bets.mjs";
+import { CHAMPION_POINTS } from "../../src/seasons.mjs";
 import { useStore } from "../../src/store";
 import {
   Button,
@@ -64,6 +65,15 @@ type Boards = {
   players: number;
   leagues: League[];
   history: Round[];
+  palmares: {
+    season: string;
+    done: boolean;
+    left: number;
+    podium: { pseudo: string; points: number; me: boolean }[];
+    myRank: number | null;
+    players: number;
+    leagues: { name: string; pseudo: string; points: number }[];
+  }[];
 };
 type Person = { id: string; pseudo: string };
 type Friends = { me: Person; friends: Person[]; incoming: Person[]; outgoing: Person[] };
@@ -90,7 +100,7 @@ export default function Pronos() {
   const { s } = useTheme();
   const { prefs, season } = useStore();
   const router = useRouter();
-  const [tab, setTab] = useState<"bet" | "rank" | "friends">("bet");
+  const [tab, setTab] = useState<"bet" | "rank" | "season" | "friends">("bet");
   if (!hasApi() || season.mode !== "live")
     return (
       <Screen>
@@ -122,6 +132,7 @@ export default function Pronos() {
         options={[
           ["bet", "Mes paris"],
           ["rank", "Classements"],
+          ["season", "Palmarès"],
           ["friends", "Amis"],
         ]}
         value={tab}
@@ -129,6 +140,7 @@ export default function Pronos() {
       />
       {tab === "bet" && <Weekend />}
       {tab === "rank" && <Rankings />}
+      {tab === "season" && <SeasonTab />}
       {tab === "friends" && <FriendsTab />}
     </Screen>
   );
@@ -568,6 +580,7 @@ function Rankings() {
               <Text style={s.small}>Ajoutez des amis dans l’onglet Amis pour vous comparer.</Text>
             )}
           </View>
+          {league && <LeagueChat id={league.id} />}
           {league && (
             <Button
               label="Quitter cette ligue"
@@ -711,5 +724,336 @@ function FriendsTab() {
         )}
       </View>
     </>
+  );
+}
+
+// Discussion d'une ligue : messages, réactions rapides, effacement.
+const REACTIONS = ["👏", "😂", "🔥", "😱", "🏆"];
+type Chat = {
+  owner: boolean;
+  messages: { id: string; pseudo: string; mine: boolean; text: string; at: number }[];
+};
+function LeagueChat({ id }: { id: string }) {
+  const { s, c } = useTheme();
+  const call = useCall();
+  const [chat, setChat] = useState<Chat | null>(null);
+  const [text, setText] = useState("");
+  const [error, setError] = useState("");
+  const run = (p: Promise<Chat>) =>
+    p
+      .then((d) => {
+        setChat(d);
+        setError("");
+        return true;
+      })
+      .catch((e) => {
+        setError(e.message);
+        return false;
+      });
+  useEffect(() => {
+    run(call(`/api/leagues/${id}/messages`));
+    // Nouveaux messages toutes les 20 s tant que la ligue est ouverte.
+    const timer = setInterval(() => run(call(`/api/leagues/${id}/messages`)), 20000);
+    return () => clearInterval(timer);
+  }, [id, call]);
+  const send = (t: string) =>
+    t.trim() &&
+    run(call(`/api/leagues/${id}/messages`, { method: "POST", body: { text: t } })).then(
+      (ok) => ok && setText(""),
+    );
+  const input = {
+    borderWidth: 1,
+    borderColor: c.line,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    color: c.ink,
+    backgroundColor: c.card,
+  };
+  const time = (at: number) =>
+    new Date(at).toLocaleString("fr-FR", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  return (
+    <>
+      <Text style={s.heading}>Discussion</Text>
+      <View style={s.card}>
+        {(chat?.messages ?? []).slice(-50).map((m) => (
+          <View key={m.id} style={[s.rank, { alignItems: "flex-start" }]}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={s.small}>
+                <Text style={{ fontWeight: "700", color: m.mine ? c.accent : c.ink }}>
+                  {m.pseudo}
+                </Text>{" "}
+                · {time(m.at)}
+              </Text>
+              <Text style={s.text}>{m.text}</Text>
+            </View>
+            {(m.mine || chat?.owner) && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Effacer ce message"
+                onPress={() =>
+                  run(call(`/api/leagues/${id}/messages/${m.id}`, { method: "DELETE" }))
+                }
+                style={s.smallButton}
+              >
+                <Text style={s.small}>Effacer</Text>
+              </Pressable>
+            )}
+          </View>
+        ))}
+        {chat && !chat.messages.length && (
+          <Text style={s.small}>Aucun message : lancez la discussion !</Text>
+        )}
+        <View style={s.pills}>
+          {REACTIONS.map((r) => (
+            <Pressable
+              key={r}
+              accessibilityRole="button"
+              accessibilityLabel={`Réagir ${r}`}
+              onPress={() => send(r)}
+              style={[s.pill, { paddingHorizontal: 12 }]}
+            >
+              <Text style={{ fontSize: 20 }}>{r}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <TextInput
+          style={input}
+          value={text}
+          onChangeText={setText}
+          maxLength={280}
+          placeholder="Votre message…"
+          onSubmitEditing={() => send(text)}
+        />
+        <Button label="Envoyer" onPress={() => send(text)} />
+        {!!error && <Text style={s.error}>{error}</Text>}
+        <Text style={s.small}>
+          Masquée quand une session est protégée, pour éviter les spoilers.
+        </Text>
+      </View>
+    </>
+  );
+}
+
+// Onglet Saison : pronos des champions et palmarès (podium animé).
+type Champions = {
+  season: string;
+  closes: number;
+  mine: { driver?: string; team?: string } | null;
+  champions: { driver: string; team: string } | null;
+  points: number | null;
+  friends: { pseudo: string; driver?: string; team?: string }[];
+};
+function SeasonTab() {
+  const { s, c, team } = useTheme();
+  const { prefs, season } = useStore();
+  const call = useCall();
+  const [data, setData] = useState<Champions | null>(null);
+  const [boards, setBoards] = useState<Boards | null>(null);
+  const [picking, setPicking] = useState<"driver" | "team" | null>(null);
+  const [error, setError] = useState("");
+  useFocusEffect(
+    useCallback(() => {
+      call("/api/champions")
+        .then(setData)
+        .catch((e) => setError(e.message));
+      call("/api/leaderboard")
+        .then(setBoards)
+        .catch(() => {});
+    }, [call]),
+  );
+  const save = (patch: { driver?: string; team?: string }) =>
+    call("/api/champions", { method: "PUT", body: patch })
+      .then((d) => {
+        setData(d);
+        setError("");
+      })
+      .catch((e) => setError(e.message));
+  const driver = (id?: string) => season.drivers.find((d) => d.id === id);
+  const teamOf = (id?: string) => season.teams.find((t) => t.id === id);
+  const open = !!data && Date.now() < data.closes;
+  const hidden = prefs.protectedSessions.length > 0;
+  const current = boards?.palmares.find((p) => p.season === data?.season) ?? boards?.palmares[0];
+  return (
+    <>
+      <View style={s.card}>
+        <Text style={s.label}>
+          CHAMPIONS {data?.season ?? ""} · PILOTE {CHAMPION_POINTS.driver} PTS · CONSTRUCTEUR{" "}
+          {CHAMPION_POINTS.team} PTS
+        </Text>
+        <Text style={s.small}>
+          {!data
+            ? "Chargement…"
+            : open
+              ? `Ouvert jusqu’au ${formatDate(data.closes)} (6 GP avant la fin). Points comptés à la dernière course.`
+              : "Fermé."}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          disabled={!open}
+          onPress={() => setPicking(picking === "driver" ? null : "driver")}
+          style={[s.rank, picking === "driver" && s.mine]}
+        >
+          <Text style={[s.text, { flex: 1 }]}>Champion pilote</Text>
+          <Text
+            style={[
+              s.text,
+              {
+                color: data?.mine?.driver ? team(driver(data.mine.driver)?.teamId ?? "") : c.muted,
+              },
+            ]}
+          >
+            {driver(data?.mine?.driver)?.name ?? (open ? "Choisir" : "—")}
+          </Text>
+        </Pressable>
+        {picking === "driver" && (
+          <DriverPicker
+            onPick={(id) => {
+              setPicking(null);
+              save({ driver: id });
+            }}
+          />
+        )}
+        <Pressable
+          accessibilityRole="button"
+          disabled={!open}
+          onPress={() => setPicking(picking === "team" ? null : "team")}
+          style={[s.rank, picking === "team" && s.mine]}
+        >
+          <Text style={[s.text, { flex: 1 }]}>Champion constructeur</Text>
+          <Text style={[s.text, { color: data?.mine?.team ? team(data.mine.team) : c.muted }]}>
+            {teamOf(data?.mine?.team)?.name ?? (open ? "Choisir" : "—")}
+          </Text>
+        </Pressable>
+        {picking === "team" && (
+          <View style={s.pills}>
+            {season.teams.map((t) => (
+              <Pressable
+                key={t.id}
+                accessibilityRole="button"
+                onPress={() => {
+                  setPicking(null);
+                  save({ team: t.id });
+                }}
+                style={[s.pill, { borderColor: team(t.id) }]}
+              >
+                <Text style={[s.text, { color: team(t.id) }]}>{t.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {data?.champions && !hidden && (
+          <Text style={s.text}>
+            Champions : {driver(data.champions.driver)?.name} et {teamOf(data.champions.team)?.name}{" "}
+            · vos points : +{data.points ?? 0}
+          </Text>
+        )}
+        {data?.friends.map((f) => (
+          <Text key={f.pseudo} style={s.small}>
+            {f.pseudo} : {driver(f.driver)?.name ?? "—"} · {teamOf(f.team)?.name ?? "—"}
+          </Text>
+        ))}
+        {!!error && <Text style={s.error}>{error}</Text>}
+      </View>
+
+      <Text style={s.heading}>Palmarès</Text>
+      {hidden ? (
+        <View style={s.lock}>
+          <Text style={s.text}>Palmarès masqué : il dévoilerait une session protégée.</Text>
+        </View>
+      ) : (
+        <>
+          {current && <Podium entry={current} />}
+          {(boards?.palmares ?? [])
+            .filter((p) => p !== current)
+            .map((p) => (
+              <View key={p.season} style={s.card}>
+                <Text style={s.label}>SAISON {p.season}</Text>
+                <Text style={s.text}>
+                  🏆 {p.podium[0]?.pseudo} ({p.podium[0]?.points} pts) · votre place :{" "}
+                  {p.myRank ? ordinal(p.myRank) : "—"} sur {p.players}
+                </Text>
+              </View>
+            ))}
+          {boards && !boards.palmares.length && (
+            <Text style={s.small}>Le palmarès se remplit avec les premiers résultats.</Text>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+function Podium({ entry }: { entry: Boards["palmares"][number] }) {
+  const { s, c } = useTheme();
+  const steps = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
+  useEffect(() => {
+    steps.forEach((v) => v.setValue(0));
+    // Révélation du 3e au 1er, comme pour le podium des courses.
+    Animated.stagger(
+      350,
+      [2, 1, 0].map((i) =>
+        Animated.timing(steps[i], { toValue: 1, duration: 500, useNativeDriver: true }),
+      ),
+    ).start();
+  }, [entry.season]);
+  const heights = [120, 90, 70];
+  const order = [1, 0, 2]; // 2e, 1er, 3e
+  return (
+    <View style={[s.card, { gap: 12 }]}>
+      <Text style={s.label}>
+        SAISON {entry.season} ·{" "}
+        {entry.done ? "PODIUM FINAL" : `PROVISOIRE · ENCORE ${entry.left} GP`}
+      </Text>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
+        {order.map((i) => {
+          const p = entry.podium[i];
+          return (
+            <Animated.View
+              key={i}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                gap: 4,
+                opacity: steps[i],
+                transform: [
+                  {
+                    translateY: steps[i].interpolate({ inputRange: [0, 1], outputRange: [30, 0] }),
+                  },
+                ],
+              }}
+            >
+              <Text style={{ fontSize: i === 0 ? 34 : 26 }}>{["🏆", "🥈", "🥉"][i]}</Text>
+              <Text style={[s.cardTitle, p?.me && { color: c.accent }]} numberOfLines={1}>
+                {p?.pseudo ?? "—"}
+              </Text>
+              <Text style={s.small}>{p ? `${p.points} pts` : ""}</Text>
+              <View
+                style={{
+                  height: heights[i],
+                  alignSelf: "stretch",
+                  borderRadius: 8,
+                  backgroundColor: i === 0 ? c.accentBg : c.soft,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={[s.title, { marginTop: 0, color: i === 0 ? "#fff" : c.accent }]}>
+                  {i + 1}
+                </Text>
+              </View>
+            </Animated.View>
+          );
+        })}
+      </View>
+      <Text style={s.text}>
+        Votre place : {entry.myRank ? ordinal(entry.myRank) : "—"} sur {entry.players} joueurs.
+      </Text>
+      {entry.leagues.map((l) => (
+        <Text key={l.name} style={s.small}>
+          {entry.done ? "Champion" : "En tête"} de « {l.name} » : {l.pseudo} ({l.points} pts)
+        </Text>
+      ))}
+    </View>
   );
 }

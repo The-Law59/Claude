@@ -48,29 +48,22 @@ export function restorePreferences(raw, sessions) {
       rumors: p.rumors === true,
       reminders: p.reminders === true,
       results: p.results !== false,
-      reminderMinutes: [10, 30, 60].includes(p.reminderMinutes)
-        ? p.reminderMinutes
-        : 30,
+      reminderMinutes: [10, 30, 60].includes(p.reminderMinutes) ? p.reminderMinutes : 30,
     };
   } catch {
     return d;
   }
 }
 export function articleVisible(article, prefs, personal = true) {
-  if (article.sessionIds.some((id) => prefs.protectedSessions.includes(id)))
-    return false;
+  if (article.sessionIds.some((id) => prefs.protectedSessions.includes(id))) return false;
   if (article.rumor && !prefs.rumors) return false;
   return !personal || article.tags.some((tag) => prefs.favorites.includes(tag));
 }
 export function notificationAllowed(event, prefs) {
   if (event.kind === "reminder") return prefs.reminders;
-  if (event.sessionIds.some((id) => prefs.protectedSessions.includes(id)))
-    return false;
+  if (event.sessionIds.some((id) => prefs.protectedSessions.includes(id))) return false;
   if (event.kind === "result") return prefs.results;
-  return (
-    articleVisible(event, prefs, true) &&
-    (prefs.frequency === "all" || event.important)
-  );
+  return articleVisible(event, prefs, true) && (prefs.frequency === "all" || event.important);
 }
 // Débloquer une session la marque « vue » ; la reprotéger efface cette marque.
 function protectIds(prefs, ids, value) {
@@ -80,13 +73,19 @@ function protectIds(prefs, ids, value) {
     protectedSessions: value
       ? [...new Set([...prefs.protectedSessions, ...ids])]
       : without(prefs.protectedSessions),
-    revealed: value ? without(prefs.revealed ?? []) : [...new Set([...(prefs.revealed ?? []), ...ids])],
+    revealed: value
+      ? without(prefs.revealed ?? [])
+      : [...new Set([...(prefs.revealed ?? []), ...ids])],
   };
 }
 export const setProtected = (prefs, id, value) => protectIds(prefs, [id], value);
 // N'ajoute ou ne retire que les sessions de ce week-end.
 export const protectWeekend = (prefs, sessions, value) =>
-  protectIds(prefs, sessions.map((s) => s.id), value);
+  protectIds(
+    prefs,
+    sessions.map((s) => s.id),
+    value,
+  );
 
 // Anti-spoil automatique : protège les sessions choisies dès 5 min avant leur
 // départ et jusqu'à 48 h après, sauf celles déjà marquées « vues ».
@@ -116,7 +115,11 @@ export function reminderPlan(sessions, prefs, now = Date.now(), name = "") {
     .filter((x) => x.date > now);
 }
 // Paris : rappel 1 h avant la fermeture de chaque partie (qualifs, sprint, course).
-const BET_SESSIONS = { Qualifying: "top 10 des qualifs", Sprint: "top 8 du sprint", Race: "top 10 de la course" };
+const BET_SESSIONS = {
+  Qualifying: "top 10 des qualifs",
+  Sprint: "top 8 du sprint",
+  Race: "top 10 de la course",
+};
 export function betReminderPlan(sessions, prefs, now = Date.now(), name = "") {
   if (!prefs.betReminders || !prefs.account) return [];
   return sessions
@@ -131,18 +134,31 @@ export function betReminderPlan(sessions, prefs, now = Date.now(), name = "") {
 }
 // Réglages partagés entre les appareils d'un compte (pas les rappels, propres
 // à chaque téléphone).
-export const SYNCED = ["favorites", "myDriver", "myTeam", "protectedSessions", "revealed", "autoProtect", "frequency", "rumors", "results", "theme"];
+export const SYNCED = [
+  "favorites",
+  "myDriver",
+  "myTeam",
+  "protectedSessions",
+  "revealed",
+  "autoProtect",
+  "frequency",
+  "rumors",
+  "results",
+  "theme",
+];
 export const syncedPart = (prefs) => Object.fromEntries(SYNCED.map((k) => [k, prefs[k]]));
 // Applique des réglages reçus du serveur, validés comme une restauration.
 export function applySynced(prefs, data, at, sessions) {
-  const clean = restorePreferences(JSON.stringify({ ...prefs, ...syncedPart({ ...prefs, ...data }) }), sessions);
+  const clean = restorePreferences(
+    JSON.stringify({ ...prefs, ...syncedPart({ ...prefs, ...data }) }),
+    sessions,
+  );
   return { ...prefs, ...syncedPart(clean), syncedAt: at };
 }
 // Week-end en cours ou à venir, et dernier week-end dont la course a démarré.
 export function focusEvents(events, now = Date.now()) {
   const raceStart = (e) => Date.parse(e.sessions.at(-1).startsAt);
-  const current =
-    events.find((e) => raceStart(e) + 4 * 3600000 > now) ?? events.at(-1);
+  const current = events.find((e) => raceStart(e) + 4 * 3600000 > now) ?? events.at(-1);
   const last = events.filter((e) => raceStart(e) <= now).at(-1) ?? current;
   return { current, last };
 }
@@ -171,7 +187,10 @@ export function duel(mine, mate) {
     .map((r) => ({ round: r.round, name: r.name, me: r, mate: byRound.get(r.round) }));
   const ahead = (key) => {
     const both = rounds.filter((r) => r.me[key] && r.mate[key]);
-    return [both.filter((r) => r.me[key] < r.mate[key]).length, both.filter((r) => r.mate[key] < r.me[key]).length];
+    return [
+      both.filter((r) => r.me[key] < r.mate[key]).length,
+      both.filter((r) => r.mate[key] < r.me[key]).length,
+    ];
   };
   const best = (list) => Math.min(...list.filter((r) => r.race && !r.dnf).map((r) => r.race));
   return {
@@ -179,5 +198,24 @@ export function duel(mine, mate) {
     race: ahead("race"),
     quali: ahead("quali"),
     best: [best(mine), best(mate)],
+  };
+}
+// Duel d'écuries, GP par GP (saisons de loadTeamSeason) : qui a marqué le
+// plus, podiums, meilleure place ; GP où l'une des deux manque ignorés.
+export function teamDuel(a, b) {
+  const other = Object.fromEntries(b.map((r) => [r.round, r]));
+  const rounds = a
+    .filter((r) => other[r.round])
+    .map((r) => ({ round: r.round, name: r.name, a: r, b: other[r.round] }));
+  const count = (f) => [
+    rounds.filter((r) => f(r.a, r.b)).length,
+    rounds.filter((r) => f(r.b, r.a)).length,
+  ];
+  const best = (list) => Math.min(...list.map((r) => r.best ?? Infinity));
+  return {
+    rounds,
+    ahead: count((x, y) => x.points > y.points),
+    podiums: [a, b].map((list) => list.filter((r) => r.best && r.best <= 3).length),
+    best: [best(a), best(b)],
   };
 }

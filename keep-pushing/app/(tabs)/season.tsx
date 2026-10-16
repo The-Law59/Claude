@@ -27,7 +27,8 @@ export default function Season() {
       {tab === "calendar" ? (
         <>
           <Text style={s.small}>
-            {season.events.length} Grands Prix · touchez un GP pour ses résultats, sa météo et sa fiche circuit
+            {season.events.length} Grands Prix · touchez un GP pour ses résultats, sa météo et sa
+            fiche circuit
           </Text>
           {season.events.map((e) => {
             const race = e.sessions.at(-1)!;
@@ -89,14 +90,21 @@ export default function Season() {
               <Text style={s.time}>{x.points} pts ›</Text>
             </Pressable>
           ))}
-          {season.mode === "live" && (
+          {season.mode === "live" && tab === "teams" && (
+            <Button
+              label="⚔ Comparer deux écuries"
+              secondary
+              onPress={() => router.push("/teams-duel")}
+            />
+          )}
+          {season.mode === "live" && tab === "drivers" && (
             <Button
               label="⚔ Comparer deux pilotes"
               secondary
               onPress={() => router.push("/duel")}
             />
           )}
-          {season.mode === "live" && (
+          {season.mode === "live" && tab === "drivers" && (
             <Button
               label="🏆 Simulateur de championnat"
               secondary
