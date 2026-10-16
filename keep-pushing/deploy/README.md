@@ -25,7 +25,60 @@ Le script installe Docker, télécharge le projet dans `/opt/keep-pushing`,
 construit l'app (quelques minutes la première fois) et affiche son adresse,
 par exemple `http://192.168.1.50:3000`. Relancer la même commande met l'app à jour.
 
-## 3. Sur le téléphone
+## 3. Traduction des actualités anglaises (facultatif)
+
+Les articles en anglais (Formula1.com, FIA, Reddit) sont traduits en français
+par l'API Claude si une clé est fournie. Sans clé, ils restent en anglais.
+
+1. Créer une clé sur https://console.anthropic.com (Settings → API Keys) et,
+   par prudence, fixer une limite de dépense mensuelle (Settings → Limits).
+2. Dans la console du conteneur :
+   ```bash
+   echo 'ANTHROPIC_API_KEY=sk-ant-...' > /opt/keep-pushing/keep-pushing/.env
+   chmod 600 /opt/keep-pushing/keep-pushing/.env
+   ```
+   (remplacer `sk-ant-...` par votre clé ; ne la partagez jamais ailleurs).
+3. Relancer la commande d'installation pour redémarrer l'app.
+
+Admins (lecture des avis, modération du forum) : ajoutez leurs pseudos dans
+le même fichier `.env`, séparés par des virgules, puis relancez l'installation :
+```bash
+echo 'ADMINS=Quentin' >> /opt/keep-pushing/keep-pushing/.env
+```
+
+Chaque article n'est traduit qu'une fois (cache conservé entre les mises à jour).
+
+Le même volume Docker garde aussi les **comptes, amis et paris**
+(`/app/data/game.json`). Pour une sauvegarde :
+```bash
+docker compose -f /opt/keep-pushing/keep-pushing/docker-compose.yml cp keep-pushing:/app/data ./sauvegarde-keep-pushing
+```
+
+Météo : les téléphones interrogent directement Open-Meteo (gratuit, sans clé,
+pour un usage non commercial ; une version payante est nécessaire si l'app
+devient commerciale).
+
+Sauvegardes : le serveur copie chaque jour `game.json` dans
+`/app/data/backups/` (14 jours gardés). Pour se protéger aussi d'une panne du
+conteneur, activez une sauvegarde planifiée du LXC dans Proxmox
+(Datacenter → Sauvegarde → Ajouter). Pour restaurer une copie :
+```bash
+cd /opt/keep-pushing/keep-pushing
+docker compose stop
+docker compose run --rm keep-pushing cp data/backups/game-AAAA-MM-JJ.json data/game.json
+docker compose start
+```
+
+Mot de passe oublié par un joueur : l'app s'arrête une minute, le temps de
+lui en générer un nouveau (affiché à l'écran, à lui transmettre) :
+```bash
+cd /opt/keep-pushing/keep-pushing
+docker compose stop
+docker compose run --rm keep-pushing node scripts/reset-password.mjs <pseudo>
+docker compose start
+```
+
+## 4. Sur le téléphone
 
 1. Même Wi-Fi que le serveur : ouvrir `http://<IP du conteneur>:3000`.
 2. Ajouter à l'écran d'accueil :

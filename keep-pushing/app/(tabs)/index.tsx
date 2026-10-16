@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
-import { articleVisible } from "../../src/model.mjs";
+import { useFocusEffect, useRouter } from "expo-router";
+import { api, hasApi } from "../../src/api.mjs";
+import { articleVisible, askFeedback, protectWeekend, teammateOf } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
-import { Button, Pills, Screen, SourceBadge, formatDate, useTheme } from "../../src/ui";
+import { Button, Pills, Screen, SourceBadge, formatDate, ordinal, useTheme } from "../../src/ui";
 
 export default function Home() {
   const { s } = useTheme();
-  const { prefs, season, focus, loadResults } = useStore();
+  const { prefs, setPrefs, season, focus, loadResults } = useStore();
   useEffect(() => loadResults(focus.last), [focus.last.id]);
   const router = useRouter();
   const [personal, setPersonal] = useState(true);
@@ -39,17 +40,49 @@ export default function Home() {
         <Text style={s.heroText}>
           {next ? `${next.label} · ${formatDate(next.startsAt)}` : "Week-end terminé"}
         </Text>
+        {season.mode === "live" && (
+          <Button
+            label="🌦 Météo, horaires et fiche circuit →"
+            onPress={() => router.push(`/gp/${current.id}`)}
+            secondary
+          />
+        )}
         <Button
           label={lastRaceProtected ? "Gérer la protection" : "Voir la dernière course →"}
           onPress={() => router.navigate(lastRaceProtected ? "/settings" : "/live")}
         />
+        {current.sessions.every((x) => prefs.protectedSessions.includes(x.id)) ? (
+          <Text style={s.heroText}>🎬 Week-end en différé : rien ne sera dévoilé.</Text>
+        ) : (
+          <Button
+            label="🎬 Je regarde ce week-end en différé"
+            onPress={() => setPrefs((p) => protectWeekend(p, current.sessions, true))}
+            secondary
+          />
+        )}
       </View>
       {prefs.protectedSessions.length > 0 && (
         <View style={s.lock}>
           <Text style={s.text}>
-            {prefs.protectedSessions.length} session(s) protégée(s). Les actualités
-            associées sont masquées.
+            {prefs.protectedSessions.length} session(s) protégée(s). Les actualités associées sont
+            masquées.
           </Text>
+        </View>
+      )}
+      {season.mode === "live" && hasApi() && !!prefs.account && <MyBets eventId={current.id} />}
+      {hasApi() && !!prefs.account && askFeedback(prefs) && (
+        <View style={s.card}>
+          <Text style={s.label}>VOTRE AVIS COMPTE</Text>
+          <Text style={s.text}>
+            Vous utilisez Keep Pushing depuis quelques jours : qu’en pensez-vous ? 2 minutes pour
+            nous aider à l’améliorer.
+          </Text>
+          <Button label="💬 Donner mon avis" onPress={() => router.push("/feedback")} />
+          <Button
+            label="Plus tard"
+            secondary
+            onPress={() => setPrefs((p) => ({ ...p, feedbackAt: Date.now() }))}
+          />
         </View>
       )}
       <Text style={s.heading}>Mon paddock</Text>
@@ -71,11 +104,18 @@ export default function Home() {
                 <Text style={s.cardTitle}>{myDriver.name} ★</Text>
                 <Text style={s.small}>
                   {myDriver.team}
-                  {lastResult ? ` · ${lastResult.position}e à ${last.name}` : ""}
+                  {lastResult ? ` · ${ordinal(lastResult.position)} à ${last.name}` : ""}
                 </Text>
               </View>
               <Text style={s.time}>{myDriver.points} pts</Text>
             </View>
+          )}
+          {myDriver && (
+            <Button
+              label={`⚔ Duel face à ${teammateOf(season.drivers, myDriver.id)?.name ?? "son coéquipier"} →`}
+              onPress={() => router.push("/duel")}
+              secondary
+            />
           )}
           {myTeam && (
             <View style={s.rank}>
@@ -117,7 +157,7 @@ export default function Home() {
           style={s.card}
           key={a.id}
         >
-          <SourceBadge kind={a.kind} lang={a.lang} />
+          <SourceBadge kind={a.kind} lang={a.lang} translated={!!a.translatedFrom} />
           <Text style={s.label}>
             {a.rumor ? "RUMEUR · " : ""}
             {a.source
@@ -127,7 +167,12 @@ export default function Home() {
                 : "ACTUALITÉ · DÉMONSTRATION"}
           </Text>
           <Text style={s.cardTitle}>{a.title}</Text>
-          <Text style={s.small}>Lire le résumé →</Text>
+          {!!a.summary && (
+            <Text style={s.cardSummary} numberOfLines={3}>
+              {a.summary}
+            </Text>
+          )}
+          <Text style={s.small}>{a.link ? "Voir l’article →" : "Lire la suite →"}</Text>
         </Pressable>
       ))}
       {!visible.length && (
@@ -149,5 +194,60 @@ export default function Home() {
         </View>
       )}
     </Screen>
+  );
+}
+
+// Ce qu'il manque à mes paris du prochain GP, avec la prochaine fermeture.
+const TODO: Record<string, string> = {
+  quali: "top 10 des qualifs",
+  sprint: "top 8 du sprint",
+  race: "top 10 de la course",
+  fastest: "meilleur tour",
+  dnf: "abandons",
+  answer: "question du week-end",
+};
+function MyBets({ eventId }: { eventId: string }) {
+  const { s, c } = useTheme();
+  const { prefs } = useStore();
+  const router = useRouter();
+  const [view, setView] = useState<{
+    closes: Record<string, number>;
+    parts: string[];
+    mine: Record<string, unknown> | null;
+  } | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      api(`/api/bets/${eventId}`, { token: prefs.account?.token })
+        .then(setView)
+        .catch(() => setView(null));
+    }, [eventId, prefs.account?.token]),
+  );
+  if (!view) return null;
+  const now = Date.now();
+  const open = [...view.parts, "fastest", "dnf", "answer"].filter((k) => now < view.closes[k]);
+  if (!open.length) return null;
+  const missing = open.filter((k) => view.mine?.[k] === undefined);
+  const nextClose = Math.min(...(missing.length ? missing : open).map((k) => view.closes[k]));
+  const hours = Math.max(0, Math.round((nextClose - now) / 3600000));
+  const when = hours < 48 ? `dans ${hours} h` : `le ${formatDate(nextClose)}`;
+  return (
+    <View style={[s.card, missing.length > 0 && { borderWidth: 2, borderColor: c.accent }]}>
+      <Text style={s.label}>MES PRONOS</Text>
+      {missing.length ? (
+        <>
+          <Text style={s.cardTitle}>
+            Il vous manque : {missing.map((k) => TODO[k]).join(", ")}.
+          </Text>
+          <Text style={s.small}>Prochaine fermeture {when}.</Text>
+          <Button label="Compléter mes pronos →" onPress={() => router.navigate("/pronos")} />
+        </>
+      ) : (
+        <>
+          <Text style={s.cardTitle}>✓ Tous vos paris sont prêts.</Text>
+          <Text style={s.small}>Modifiables jusqu’à la fermeture, {when}.</Text>
+          <Button label="Revoir mes pronos" secondary onPress={() => router.navigate("/pronos")} />
+        </>
+      )}
+    </View>
   );
 }

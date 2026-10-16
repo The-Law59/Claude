@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
-import { reminderPlan } from "./model.mjs";
+import { betReminderPlan, reminderPlan } from "./model.mjs";
 export async function syncReminders(
   prefs: any,
   event: { name: string; sessions: { id: string; label: string; startsAt: string }[] },
@@ -11,7 +11,7 @@ export async function syncReminders(
       name: "Rappels de sessions",
       importance: Notifications.AndroidImportance.DEFAULT,
     });
-  if (prefs.reminders) {
+  if (prefs.reminders || prefs.betReminders) {
     let permission = await Notifications.getPermissionsAsync();
     if (!permission.granted)
       permission = await Notifications.requestPermissionsAsync();
@@ -22,7 +22,10 @@ export async function syncReminders(
   }
   // Toutes les notifications de cette V1 sont des rappels neutres, jamais des résultats.
   await Notifications.cancelAllScheduledNotificationsAsync();
-  const plan = reminderPlan(event.sessions, prefs, Date.now(), event.name);
+  const plan = [
+    ...reminderPlan(event.sessions, prefs, Date.now(), event.name),
+    ...betReminderPlan(event.sessions, prefs, Date.now(), event.name),
+  ];
   for (const r of plan)
     await Notifications.scheduleNotificationAsync({
       identifier: `kp-${r.id}`,

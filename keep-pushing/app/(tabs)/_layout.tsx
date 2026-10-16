@@ -1,10 +1,13 @@
 import { Text } from "react-native";
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
+import { hasApi } from "../../src/api.mjs";
+import { useStore } from "../../src/store";
 import { useTheme } from "../../src/ui";
 
 const tabs = [
   ["index", "⌂", "Accueil"],
-  ["live", "◉", "Course"],
+  ["pronos", "◎", "Pronos"],
+  ["forum", "❝", "Forum"],
   ["season", "▦", "Saison"],
   ["favorites", "♡", "Favoris"],
   ["settings", "☷", "Réglages"],
@@ -12,12 +15,16 @@ const tabs = [
 
 export default function TabsLayout() {
   const { c } = useTheme();
+  const { prefs } = useStore();
+  // Premier lancement : portail de connexion (si un serveur est joignable).
+  if (!prefs.welcomed && !prefs.account && hasApi()) return <Redirect href="/login" />;
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: c.accent,
         tabBarInactiveTintColor: c.muted,
+        tabBarStyle: { backgroundColor: c.card, borderTopColor: c.line },
       }}
     >
       {tabs.map(([name, icon, title]) => (
@@ -32,6 +39,8 @@ export default function TabsLayout() {
           }}
         />
       ))}
+      {/* Dernière course : ouverte depuis l'accueil, pas d'onglet dédié. */}
+      <Tabs.Screen name="live" options={{ href: null }} />
     </Tabs>
   );
 }
