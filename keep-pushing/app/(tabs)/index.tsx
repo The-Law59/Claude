@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { api, hasApi } from "../../src/api.mjs";
+import { RecapCard } from "../../src/RecapCard";
 import { articleVisible, askFeedback, protectWeekend, teammateOf } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
 import { Button, Pills, Screen, SourceBadge, formatDate, ordinal, useTheme } from "../../src/ui";
@@ -69,6 +70,18 @@ export default function Home() {
           </Text>
         </View>
       )}
+      {season.mode === "live" &&
+        hasApi() &&
+        !!prefs.account &&
+        prefs.recapClosed !== last.id &&
+        // Récap du dernier GP jusqu'au début du week-end suivant.
+        last.id !== current.id &&
+        Date.now() < Date.parse(current.sessions[0].startsAt) && (
+          <RecapCard
+            eventId={last.id}
+            onClose={() => setPrefs((p) => ({ ...p, recapClosed: last.id }))}
+          />
+        )}
       {season.mode === "live" && hasApi() && !!prefs.account && <MyBets eventId={current.id} />}
       {hasApi() && !!prefs.account && askFeedback(prefs) && (
         <View style={s.card}>

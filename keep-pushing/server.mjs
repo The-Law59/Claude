@@ -15,6 +15,8 @@ import * as bets from "./src/bets.mjs";
 import * as leagues from "./src/leagues.mjs";
 import * as seasons from "./src/seasons.mjs";
 import * as community from "./src/community.mjs";
+import * as notify from "./src/notify.mjs";
+import { exactCount, highlights } from "./src/recap.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
 const DATA = join(import.meta.dirname, "data");
@@ -280,6 +282,44 @@ async function rankings(user) {
   };
 }
 
+// Récap d'un GP terminé pour un joueur : points, meilleurs coups, place au
+// général avant/après, comparaison avec ses amis.
+async function recap(user, eventId) {
+  const event = findEvent(eventId);
+  const bet = state.bets[eventId]?.[user.id];
+  if (!event || !bet) return [404, { error: "Pas de pronos sur ce Grand Prix." }];
+  await roundResults(event).catch(() => ({}));
+  const results = bySession(eventId);
+  if (!results?.Race?.length) return [404, { error: "Récap disponible après la course." }];
+  const score = bets.scoreBet(bet, results);
+  const board = await rankings(user);
+  const i = board.history.findIndex((h) => h.eventId === eventId);
+  const short = (id) =>
+    season.drivers
+      .find((d) => d.id === id)
+      ?.name.split(" ")
+      .at(-1) ?? "?";
+  const byUser = state.bets[eventId];
+  const friends = accounts.friendIds(state, user).filter((f) => byUser[f]);
+  const beaten = friends.filter((f) => bets.scoreBet(byUser[f], results).total < score.total);
+  return [
+    200,
+    {
+      eventId,
+      event: event.name,
+      points: score.total,
+      joker: score.joker,
+      exact: exactCount(score),
+      highlights: highlights(bet, score, short),
+      best: board.history[i]?.best ?? null,
+      rankBefore: board.history[i - 1]?.rank ?? null,
+      rankAfter: board.history[i]?.rank ?? null,
+      players: board.players,
+      friends: { total: friends.length, beaten: beaten.length },
+    },
+  ];
+}
+
 // Palmarès : podium de chaque saison (en cours = provisoire), ma place, et
 // le leader de chacune de mes ligues.
 function palmares(user, all) {
@@ -382,8 +422,10 @@ async function api(req, path) {
     const user = auth();
     const admin = community.isAdmin(user, ADMINS);
     const [, topicId, postId, isReport] = topic;
-    if (req.method === "POST" && !postId)
+    if (req.method === "POST" && !postId) {
       community.reply(state, user, topicId, await readJson(req));
+      notify.notifyReply(state, state.forum.topics[topicId], user);
+    }
     if (req.method === "POST" && isReport) community.report(state, user, topicId, postId);
     if (req.method === "DELETE" && postId) {
       community.deletePost(state, user, topicId, postId, admin);
@@ -405,6 +447,22 @@ async function api(req, path) {
     return [200, await changed(accounts.friendsView(state, user))];
   }
   if (path === "/api/leaderboard") return [200, await rankings(auth())];
+  if (path === "/api/notifications") {
+    const user = auth();
+    if (req.method === "POST") {
+      const { ids, link } = await readJson(req);
+      notify.markRead(
+        state,
+        user.id,
+        Array.isArray(ids) ? ids : undefined,
+        typeof link === "string" ? link : undefined,
+      );
+      await save();
+    }
+    return [200, notify.inbox(state, user.id)];
+  }
+  const recapRoute = path.match(/^\/api\/recap\/([\w-]+)$/);
+  if (recapRoute) return recap(auth(), recapRoute[1]);
   if (path === "/api/leagues" && req.method === "POST") {
     const user = auth();
     leagues.createLeague(state, user, await readJson(req));
@@ -418,7 +476,10 @@ async function api(req, path) {
   const chat = path.match(/^\/api\/leagues\/([\w-]+)\/messages(?:\/([\w-]+))?$/);
   if (chat) {
     const user = auth();
-    if (req.method === "POST") leagues.postMessage(state, user, chat[1], await readJson(req));
+    if (req.method === "POST") {
+      leagues.postMessage(state, user, chat[1], await readJson(req));
+      notify.notifyLeague(state, state.leagues[chat[1]], user);
+    }
     if (req.method === "DELETE" && chat[2]) leagues.deleteMessage(state, user, chat[1], chat[2]);
     if (req.method !== "GET") await save();
     return [200, leagues.messagesOf(state, user, chat[1])];

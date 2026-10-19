@@ -13,12 +13,9 @@ export async function syncReminders(
     });
   if (prefs.reminders || prefs.betReminders) {
     let permission = await Notifications.getPermissionsAsync();
+    if (!permission.granted) permission = await Notifications.requestPermissionsAsync();
     if (!permission.granted)
-      permission = await Notifications.requestPermissionsAsync();
-    if (!permission.granted)
-      throw new Error(
-        "Notifications refusées. Autorisez-les dans les réglages du téléphone.",
-      );
+      throw new Error("Notifications refusées. Autorisez-les dans les réglages du téléphone.");
   }
   // Toutes les notifications de cette V1 sont des rappels neutres, jamais des résultats.
   await Notifications.cancelAllScheduledNotificationsAsync();
@@ -36,7 +33,16 @@ export async function syncReminders(
         channelId: "sessions",
       },
     });
-  return plan.length
-    ? `${plan.length} rappels programmés.`
-    : "Aucun rappel à venir.";
+  return plan.length ? `${plan.length} rappels programmés.` : "Aucun rappel à venir.";
+}
+
+// Alerte immédiate (réponse au forum, message de ligue), seulement si les
+// notifications sont déjà autorisées : on ne redemande pas la permission.
+export async function notifyNow(title: string, body: string) {
+  if (Platform.OS === "web") return;
+  const permission = await Notifications.getPermissionsAsync().catch(() => null);
+  if (!permission?.granted) return;
+  await Notifications.scheduleNotificationAsync({ content: { title, body }, trigger: null }).catch(
+    () => {},
+  );
 }

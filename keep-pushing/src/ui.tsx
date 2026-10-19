@@ -156,7 +156,7 @@ export function Pills<T extends string | number | boolean>({
 // En-tête commun : marque, bouclier anti-spoil, origine des données.
 export function Screen({ children }: { children: React.ReactNode }) {
   const { c, s, dark } = useTheme();
-  const { prefs, season, error } = useStore();
+  const { prefs, season, error, inbox } = useStore();
   const router = useRouter();
   const protectedAny = prefs.protectedSessions.length > 0;
   return (
@@ -169,15 +169,30 @@ export function Screen({ children }: { children: React.ReactNode }) {
           </Text>
           <Text style={s.small}>La F1 à votre rythme.</Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Gérer l’anti-spoil"
-          onPress={() => router.navigate("/settings")}
-          style={[s.shield, protectedAny && { backgroundColor: c.lockOn }]}
-        >
-          <Text style={{ color: protectedAny ? c.green : c.ink }}>◈</Text>
-          <Text style={s.tiny}>{protectedAny ? "Protégé" : "Anti-spoil"}</Text>
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {!!prefs.account && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Notifications : ${inbox.unread} non lue(s)`}
+              onPress={() => router.push("/notifications")}
+              style={s.shield}
+            >
+              <Text style={{ color: c.ink }}>🔔</Text>
+              <Text style={[s.tiny, inbox.unread > 0 && { color: c.accent, fontWeight: "700" }]}>
+                {inbox.unread > 0 ? `${inbox.unread} nouv.` : "Notifs"}
+              </Text>
+            </Pressable>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Gérer l’anti-spoil"
+            onPress={() => router.navigate("/settings")}
+            style={[s.shield, protectedAny && { backgroundColor: c.lockOn }]}
+          >
+            <Text style={{ color: protectedAny ? c.green : c.ink }}>◈</Text>
+            <Text style={s.tiny}>{protectedAny ? "Protégé" : "Anti-spoil"}</Text>
+          </Pressable>
+        </View>
       </View>
       <View style={s.demo}>
         <Text style={s.tiny}>

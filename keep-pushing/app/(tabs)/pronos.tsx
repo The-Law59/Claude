@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Pressable, Text, TextInput, View } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { api, hasApi } from "../../src/api.mjs";
 import { PARTS, POINTS } from "../../src/bets.mjs";
 import { CHAMPION_POINTS } from "../../src/seasons.mjs";
+import { RecapCard } from "../../src/RecapCard";
 import { useStore } from "../../src/store";
 import {
   Button,
@@ -87,6 +88,11 @@ export default function Pronos() {
   const { prefs, season } = useStore();
   const router = useRouter();
   const [tab, setTab] = useState<"bet" | "rank" | "season" | "friends">("bet");
+  // Lien d'une notification de ligue : …/pronos?league=<id>.
+  const { league } = useLocalSearchParams<{ league?: string }>();
+  useEffect(() => {
+    if (league) setTab("rank");
+  }, [league]);
   if (!hasApi() || season.mode !== "live")
     return (
       <Screen>
@@ -125,7 +131,7 @@ export default function Pronos() {
         onChange={setTab}
       />
       {tab === "bet" && <Weekend />}
-      {tab === "rank" && <Rankings />}
+      {tab === "rank" && <Rankings key={league} initial={league} />}
       {tab === "season" && <SeasonTab />}
       {tab === "friends" && <FriendsTab />}
     </Screen>
@@ -406,6 +412,7 @@ function Weekend() {
           </View>
 
           {anyOpen && <Button label="Enregistrer mes paris" onPress={save} />}
+          {!!view.mine && !!view.results.Race?.length && <RecapCard eventId={event.id} />}
           {!!notice && <Text style={s.small}>{notice}</Text>}
           <Text style={s.small}>
             Barème par case : place exacte {POINTS.exact} pts · à une place près {POINTS.close} pts
@@ -454,11 +461,11 @@ function Weekend() {
   );
 }
 
-function Rankings() {
+function Rankings({ initial }: { initial?: string }) {
   const { s, c } = useTheme();
   const { prefs } = useStore();
   const call = useCall();
-  const [scope, setScope] = useState("general");
+  const [scope, setScope] = useState(initial ?? "general");
   const [data, setData] = useState<Boards | null>(null);
   const [error, setError] = useState("");
   const [name, setName] = useState("");
@@ -736,6 +743,7 @@ type Chat = {
 function LeagueChat({ id }: { id: string }) {
   const { s, c } = useTheme();
   const call = useCall();
+  const { markRead } = useStore();
   const [chat, setChat] = useState<Chat | null>(null);
   const [text, setText] = useState("");
   const [error, setError] = useState("");
@@ -752,6 +760,7 @@ function LeagueChat({ id }: { id: string }) {
       });
   useEffect(() => {
     run(call(`/api/leagues/${id}/messages`));
+    markRead(`/pronos?league=${id}`);
     // Nouveaux messages toutes les 20 s tant que la ligue est ouverte.
     const timer = setInterval(() => run(call(`/api/leagues/${id}/messages`)), 20000);
     return () => clearInterval(timer);

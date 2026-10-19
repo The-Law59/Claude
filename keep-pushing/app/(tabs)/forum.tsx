@@ -234,6 +234,7 @@ function TopicCard({
   const { s, c } = useTheme();
   const router = useRouter();
   const call = useCall();
+  const { markRead } = useStore();
   const [posts, setPosts] = useState<Post[] | null>(null);
   const [text, setText] = useState("");
   const [error, setError] = useState("");
@@ -242,6 +243,7 @@ function TopicCard({
       .then((d) => {
         setPosts(d.posts);
         setError("");
+        markRead(`/forum/${t.id}`);
       })
       .catch((e) => setError(e.message));
   const send = () =>

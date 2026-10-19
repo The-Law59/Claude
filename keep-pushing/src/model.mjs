@@ -13,6 +13,7 @@ export const defaults = () => ({
   theme: "auto", // "auto" | "light" | "dark"
   firstSeen: 0, // premier lancement (rappel « donnez votre avis »)
   feedbackAt: 0, // dernier avis donné ou rappel refusé
+  recapClosed: "", // dernier GP dont le récap a été fermé sur l'accueil
   frequency: "important",
   rumors: false,
   reminders: false,
@@ -46,6 +47,7 @@ export function restorePreferences(raw, sessions) {
       theme: ["light", "dark"].includes(p.theme) ? p.theme : "auto",
       firstSeen: Number.isFinite(p.firstSeen) ? p.firstSeen : 0,
       feedbackAt: Number.isFinite(p.feedbackAt) ? p.feedbackAt : 0,
+      recapClosed: typeof p.recapClosed === "string" ? p.recapClosed : "",
       myDriver: typeof p.myDriver === "string" ? p.myDriver : "",
       myTeam: typeof p.myTeam === "string" ? p.myTeam : "",
       frequency: p.frequency === "all" ? "all" : "important",

@@ -28,7 +28,7 @@ type Topic = {
 export default function ForumTopic() {
   const { s, c } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { prefs, season } = useStore();
+  const { prefs, season, markRead } = useStore();
   const router = useRouter();
   const call = useCall();
   const [topic, setTopic] = useState<Topic | null>(null);
@@ -48,7 +48,12 @@ export default function ForumTopic() {
         setError(e.message);
         return false;
       });
-  useFocusEffect(useCallback(() => void run(call(`/api/forum/${id}`)), [id, call]));
+  useFocusEffect(
+    useCallback(() => {
+      run(call(`/api/forum/${id}`));
+      markRead(`/forum/${id}`);
+    }, [id, call]),
+  );
   const back = <Button label="← Retour au forum" onPress={leave} secondary />;
   if (!topic)
     return (

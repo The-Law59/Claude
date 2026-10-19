@@ -4,6 +4,7 @@ import { demoSeason } from "./data.mjs";
 import { loadRound, loadSeason } from "./jolpica.mjs";
 import { loadNews, toArticle } from "./news.mjs";
 import { api, hasApi } from "./api.mjs";
+import { notifyNow } from "./reminders";
 import {
   applySynced,
   autoProtect,
@@ -29,6 +30,7 @@ export type Prefs = {
   theme: "auto" | "light" | "dark";
   firstSeen: number;
   feedbackAt: number;
+  recapClosed: string;
   frequency: string;
   rumors: boolean;
   reminders: boolean;
@@ -77,7 +79,25 @@ type Store = {
   loadResults: (event: Event) => void;
   ready: boolean;
   error: string;
+  inbox: Inbox;
+  markRead: (link?: string) => void;
 };
+export type Notice = {
+  id: string;
+  key: string;
+  text: string;
+  link: string;
+  eventId: string | null;
+  count: number;
+  at: number;
+  read: boolean;
+};
+type Inbox = { unread: number; items: Notice[] };
+// Texte d'une notification, neutre si elle touche un GP protégé (anti-spoil).
+export const noticeText = (n: Notice, prefs: Prefs) =>
+  n.eventId && prefs.protectedSessions.some((id) => id.startsWith(`${n.eventId}:`))
+    ? "Nouvelle réponse dans un sujet masqué (anti-spoil)"
+    : n.text;
 const Ctx = createContext<Store | null>(null);
 export const useStore = () => useContext(Ctx)!;
 
@@ -185,10 +205,42 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }, 1500);
     return () => clearTimeout(timer);
   }, [part, ready, token, pulledFor]);
+  // Notifications : relevées à l'ouverture puis chaque minute ; une alerte
+  // du téléphone quand il y a du nouveau (appli ouverte ou en arrière-plan).
+  const [inbox, setInbox] = useState<Inbox>({ unread: 0, items: [] });
+  const seen = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !token || !hasApi()) return setInbox({ unread: 0, items: [] });
+    const poll = () =>
+      api("/api/notifications", { token })
+        .then((box: Inbox) => {
+          setInbox(box);
+          const latest = box.items.find((n) => !n.read);
+          const stamp = latest && `${latest.id}:${latest.count}`;
+          if (latest && seen.current !== null && stamp !== seen.current)
+            notifyNow("Keep Pushing", noticeText(latest, prefsRef.current));
+          seen.current = stamp ?? "";
+        })
+        .catch(() => {});
+    poll();
+    const timer = setInterval(poll, 60000);
+    return () => clearInterval(timer);
+  }, [ready, token]);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+  // Marque comme lues les notifications d'un lien (sujet, ligue), ou toutes.
+  const markRead = (link?: string) => {
+    if (!token || !hasApi()) return;
+    api("/api/notifications", { method: "POST", body: { link }, token })
+      .then(setInbox)
+      .catch(() => {});
+  };
   const focus = useMemo(() => focusEvents(season.events) as Store["focus"], [season]);
   const update = (patch: Partial<Prefs>) => setPrefs((p) => ({ ...p, ...patch }));
   return (
-    <Ctx.Provider value={{ prefs, setPrefs, update, season, focus, loadResults, ready, error }}>
+    <Ctx.Provider
+      value={{ prefs, setPrefs, update, season, focus, loadResults, ready, error, inbox, markRead }}
+    >
       {children}
     </Ctx.Provider>
   );

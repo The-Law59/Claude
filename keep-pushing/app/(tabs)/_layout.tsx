@@ -15,7 +15,14 @@ const tabs = [
 
 export default function TabsLayout() {
   const { c } = useTheme();
-  const { prefs } = useStore();
+  const { prefs, inbox } = useStore();
+  // Pastilles : réponses au forum non lues, messages de ligue non lus.
+  const unread = (prefix: string) =>
+    inbox.items.filter((n) => !n.read && n.key.startsWith(prefix)).length || undefined;
+  const badges: Record<string, number | undefined> = {
+    forum: unread("forum:"),
+    pronos: unread("league:"),
+  };
   // Premier lancement : portail de connexion (si un serveur est joignable).
   if (!prefs.welcomed && !prefs.account && hasApi()) return <Redirect href="/login" />;
   return (
@@ -33,9 +40,8 @@ export default function TabsLayout() {
           name={name}
           options={{
             title,
-            tabBarIcon: ({ color }) => (
-              <Text style={{ fontSize: 22, color }}>{icon}</Text>
-            ),
+            tabBarBadge: badges[name],
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>{icon}</Text>,
           }}
         />
       ))}
