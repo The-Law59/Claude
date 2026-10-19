@@ -13,6 +13,7 @@ type Topic = {
   title: string;
   eventId: string | null;
   pseudo: string;
+  text: string;
   replies: number;
   lastAt: number;
 };
@@ -132,24 +133,7 @@ export default function Forum() {
             </Text>
           </View>
         ) : (
-          <Pressable
-            key={t.id}
-            accessibilityRole="link"
-            onPress={() => router.push(`/forum/${t.id}`)}
-            style={s.card}
-          >
-            <Text style={s.label}>
-              {CATEGORIES[t.category].toUpperCase()}
-              {t.eventId
-                ? ` · ${eventName(t.eventId)?.replace(" Grand Prix", "").toUpperCase()}`
-                : ""}
-            </Text>
-            <Text style={s.cardTitle}>{t.title}</Text>
-            <Text style={s.small}>
-              par {t.pseudo} · {t.replies} réponse{t.replies > 1 ? "s" : ""} ·{" "}
-              {formatDate(t.lastAt)}
-            </Text>
-          </Pressable>
+          <TopicCard key={t.id} topic={t} event={eventName(t.eventId)} onChange={load} />
         ),
       )}
       {data && !data.topics.length && (
@@ -231,6 +215,111 @@ function NewTopic({
       {!!error && <Text style={s.error}>{error}</Text>}
       <Button label="Publier" onPress={submit} />
       <Button label="Annuler" secondary onPress={onCancel} />
+    </View>
+  );
+}
+
+// Sujet dans la liste : premier message, réponses dépliables en cascade et
+// réponse directe, sans ouvrir la fiche (gardée pour signaler, effacer…).
+type Post = { id: string; pseudo: string; mine: boolean; text: string; at: number };
+function TopicCard({
+  topic: t,
+  event,
+  onChange,
+}: {
+  topic: Topic;
+  event?: string;
+  onChange: () => void;
+}) {
+  const { s, c } = useTheme();
+  const router = useRouter();
+  const call = useCall();
+  const [posts, setPosts] = useState<Post[] | null>(null);
+  const [text, setText] = useState("");
+  const [error, setError] = useState("");
+  const load = () =>
+    call(`/api/forum/${t.id}`)
+      .then((d) => {
+        setPosts(d.posts);
+        setError("");
+      })
+      .catch((e) => setError(e.message));
+  const send = () =>
+    text.trim() &&
+    call(`/api/forum/${t.id}`, { method: "POST", body: { text } })
+      .then((d) => {
+        setPosts(d.posts);
+        setText("");
+        setError("");
+        onChange();
+      })
+      .catch((e) => setError(e.message));
+  const replies = posts ? posts.length - 1 : t.replies;
+  return (
+    <View style={s.card}>
+      <Pressable accessibilityRole="link" onPress={() => router.push(`/forum/${t.id}`)}>
+        <Text style={s.label}>
+          {CATEGORIES[t.category].toUpperCase()}
+          {event ? ` · ${event.replace(" Grand Prix", "").toUpperCase()}` : ""}
+        </Text>
+        <Text style={s.cardTitle}>{t.title}</Text>
+      </Pressable>
+      <Text style={s.small}>
+        par {t.pseudo} · {formatDate(t.lastAt)}
+      </Text>
+      <Text style={s.text}>{t.text}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: !!posts }}
+        onPress={() => (posts ? setPosts(null) : load())}
+        style={s.smallButton}
+      >
+        <Text style={s.link}>
+          {posts
+            ? "Replier ▴"
+            : replies
+              ? `💬 Voir ${replies} réponse${replies > 1 ? "s" : ""} ▾`
+              : "💬 Répondre ▾"}
+        </Text>
+      </Pressable>
+      {posts && (
+        <View style={{ gap: 10, borderLeftWidth: 3, borderLeftColor: c.soft, paddingLeft: 12 }}>
+          {posts.slice(1).map((p) => (
+            <View key={p.id} style={{ gap: 2 }}>
+              <Text style={s.small}>
+                <Text style={{ fontWeight: "700", color: p.mine ? c.accent : c.ink }}>
+                  {p.pseudo}
+                </Text>{" "}
+                · {formatDate(p.at)}
+              </Text>
+              <Text style={s.text}>{p.text}</Text>
+            </View>
+          ))}
+          <TextInput
+            style={{
+              borderWidth: 1,
+              borderColor: c.line,
+              borderRadius: 10,
+              padding: 10,
+              fontSize: 15,
+              color: c.ink,
+              backgroundColor: c.card,
+              minHeight: 60,
+              textAlignVertical: "top",
+            }}
+            value={text}
+            onChangeText={setText}
+            maxLength={2000}
+            multiline
+            placeholder="Votre réponse…"
+          />
+          {!!error && <Text style={s.error}>{error}</Text>}
+          <Button label="Répondre" onPress={send} />
+          <Pressable accessibilityRole="link" onPress={() => router.push(`/forum/${t.id}`)}>
+            <Text style={s.small}>Ouvrir le sujet (signaler, effacer, masquer un joueur) ›</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }

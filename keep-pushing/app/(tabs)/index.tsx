@@ -212,6 +212,7 @@ function MyBets({ eventId }: { eventId: string }) {
   const router = useRouter();
   const [view, setView] = useState<{
     closes: Record<string, number>;
+    opens: Record<string, number>;
     parts: string[];
     mine: Record<string, unknown> | null;
   } | null>(null);
@@ -224,8 +225,26 @@ function MyBets({ eventId }: { eventId: string }) {
   );
   if (!view) return null;
   const now = Date.now();
-  const open = [...view.parts, "fastest", "dnf", "answer"].filter((k) => now < view.closes[k]);
-  if (!open.length) return null;
+  const keys = [...view.parts, "fastest", "dnf", "answer"];
+  const open = keys.filter((k) => now >= view.opens[k] && now < view.closes[k]);
+  const soon = keys
+    .filter((k) => now < view.opens[k])
+    .sort((a, b) => view.opens[a] - view.opens[b]);
+  if (!open.length && !soon.length) return null;
+  if (!open.length)
+    return (
+      <View style={s.card}>
+        <Text style={s.label}>MES PRONOS</Text>
+        <Text style={s.text}>
+          Prochaine ouverture le {formatDate(view.opens[soon[0]])} :{" "}
+          {soon
+            .filter((k) => view.opens[k] === view.opens[soon[0]])
+            .map((k) => TODO[k])
+            .join(", ")}
+          .
+        </Text>
+      </View>
+    );
   const missing = open.filter((k) => view.mine?.[k] === undefined);
   const nextClose = Math.min(...(missing.length ? missing : open).map((k) => view.closes[k]));
   const hours = Math.max(0, Math.round((nextClose - now) / 3600000));

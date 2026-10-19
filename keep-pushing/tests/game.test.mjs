@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as accounts from "../src/accounts.mjs";
 import {
   mergeBet, scoreBet, scoreList, visibleBet, leaderboard, partsOf, perRound, history,
-  questionOf, answerOf, closesAt, POINTS,
+  questionOf, answerOf, closesAt, opensAt, mondayAfter, POINTS,
 } from "../src/bets.mjs";
 import { createLeague, joinLeague, leaveLeague, leaguesOf, postMessage, deleteMessage, messagesOf } from "../src/leagues.mjs";
 import { championsCloseAt, mergeChampions, scoreChampions, standingsBySeason, backupName, backupsToDelete } from "../src/seasons.mjs";
@@ -84,20 +84,41 @@ const sprintWeekend = {
 const ids = Array.from({ length: 22 }, (_, i) => `d${i + 1}`);
 const top = (n) => ids.slice(0, n);
 
-test("Paris : parties du week-end, fermeture au départ de chaque session", () => {
+test("Paris : parties du week-end, ouverture et fermeture de chaque partie", () => {
   assert.deepEqual(partsOf(sprintWeekend), ["quali", "sprint", "race"]);
+  // Avant les qualifs : course, meilleur tour et abandons pas encore ouverts.
   const before = mergeBet(sprintWeekend, undefined, { quali: top(10), sprint: top(8), race: top(10), fastest: "d1", dnf: 2 }, ids, T - H);
   assert.deepEqual(before.sprint, top(8));
-  // Après le départ du sprint : le sprint est figé, le reste modifiable.
-  const after = mergeBet(sprintWeekend, before, { sprint: ids.slice(1, 9), quali: ids.slice(1, 11), dnf: 3 }, ids, T + H);
+  assert.deepEqual([before.race, before.fastest, before.dnf], [undefined, undefined, undefined]);
+  // 1 h après le début des qualifs : qualifs et sprint figés, course ouverte.
+  const after = mergeBet(sprintWeekend, before, { sprint: ids.slice(1, 9), quali: ids.slice(1, 11), race: top(10), dnf: 3 }, ids, T + 5 * H);
   assert.deepEqual(after.sprint, top(8));
-  assert.deepEqual(after.quali, ids.slice(1, 11));
+  assert.deepEqual(after.quali, top(10));
+  assert.deepEqual(after.race, top(10));
   assert.equal(after.dnf, 3);
-  throws(() => mergeBet(sprintWeekend, {}, { race: [...top(9), "d1"] }, ids, T), 400); // doublon
-  throws(() => mergeBet(sprintWeekend, {}, { race: top(9) }, ids, T), 400); // incomplet
-  throws(() => mergeBet(sprintWeekend, {}, { fastest: "inconnu" }, ids, T), 400);
+  const later = T + 6 * H;
+  throws(() => mergeBet(sprintWeekend, {}, { race: [...top(9), "d1"] }, ids, later), 400); // doublon
+  throws(() => mergeBet(sprintWeekend, {}, { race: top(9) }, ids, later), 400); // incomplet
+  throws(() => mergeBet(sprintWeekend, {}, { fastest: "inconnu" }, ids, later), 400);
   // Les autres ne voient que les parties fermées.
-  assert.deepEqual(Object.keys(visibleBet(sprintWeekend, after, T + H)), ["sprint"]);
+  assert.deepEqual(Object.keys(visibleBet(sprintWeekend, after, T + 5 * H)).sort(), ["quali", "sprint"]);
+  assert.equal(answerOf("pole", []), null);
+});
+
+test("Ouverture des qualifs le lundi qui suit le GP précédent", () => {
+  const prevRace = Date.parse("2026-04-26T13:00:00Z"); // dimanche
+  const monday = Date.parse("2026-04-27T00:00:00Z");
+  assert.equal(mondayAfter(prevRace), monday);
+  assert.equal(mondayAfter(Date.parse("2026-04-25T20:00:00Z")), monday); // course un samedi
+  assert.equal(opensAt(sprintWeekend, "quali", prevRace), monday);
+  assert.equal(opensAt(sprintWeekend, "joker", prevRace), monday);
+  assert.equal(opensAt(sprintWeekend, "race", prevRace), T + 5 * H); // qualifs + 1 h
+  assert.equal(opensAt(sprintWeekend, "quali", null), 0); // premier GP : toujours ouvert
+  // Dimanche soir : trop tôt pour le GP suivant.
+  const early = mergeBet(sprintWeekend, {}, { quali: top(10) }, ids, monday - H, prevRace);
+  assert.equal(early.quali, undefined);
+  const ok = mergeBet(sprintWeekend, {}, { quali: top(10) }, ids, monday + H, prevRace);
+  assert.deepEqual(ok.quali, top(10));
 });
 
 test("Barème du tableau : exact, à une place près, dans le top, bonus parfait", () => {
@@ -152,16 +173,18 @@ test("Question du week-end : choisie par manche, réponse tirée des résultats"
   assert.equal(answerOf("pole", []), null);
 });
 
-test("Réponse et joker : enregistrés tant que c'est ouvert", () => {
+test("Réponse et joker : chacun dans sa fenêtre", () => {
   const ev = { ...sprintWeekend, round: 4 };
+  // Avant les qualifs : joker oui, question pas encore.
   const bet = mergeBet(ev, {}, { answer: true, joker: true }, ids, T - 30 * H);
-  assert.equal(bet.question, questionOf(ev).id);
   assert.equal(bet.joker, true);
+  assert.equal(bet.answer, undefined);
   assert.equal(closesAt(ev, "joker"), T); // départ du sprint, première partie pariée
-  // Joker figé après le début du week-end, réponse encore modifiable.
-  const later = mergeBet(ev, bet, { answer: false, joker: false }, ids, T + H);
+  // Après les qualifs : question ouverte, joker figé.
+  const later = mergeBet(ev, bet, { answer: false, joker: false }, ids, T + 5 * H);
   assert.deepEqual([later.answer, later.joker], [false, true]);
-  throws(() => mergeBet(ev, {}, { answer: "peut-être" }, ids, T), 400);
+  assert.equal(later.question, questionOf(ev).id);
+  throws(() => mergeBet(ev, {}, { answer: "peut-être" }, ids, T + 5 * H), 400);
 });
 
 test("Historique manche par manche : points, meilleur, place au cumul", () => {

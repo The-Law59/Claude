@@ -161,6 +161,7 @@ export function listTopics(state, user, category) {
       title: t.title,
       eventId: t.eventId,
       pseudo: pseudo(state, t.posts[0].userId),
+      text: t.posts[0].text.slice(0, 500),
       replies: t.posts.length - 1,
       lastAt: t.lastAt,
     }));

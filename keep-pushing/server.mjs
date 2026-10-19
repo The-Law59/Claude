@@ -103,6 +103,11 @@ const bySession = (eventId) => {
   );
 };
 const findEvent = (id) => season?.events.find((e) => e.id === id);
+// Départ de la course du GP précédent : les paris du suivant ouvrent le lundi d'après.
+const prevRace = (event) => {
+  const i = season?.events.findIndex((e) => e.id === event.id) ?? -1;
+  return i > 0 ? Date.parse(season.events[i - 1].sessions.at(-1).startsAt) : null;
+};
 
 // --- Comptes, amis et paris : état JSON, sauvegardé après chaque modification.
 const GAME = join(DATA, "game.json");
@@ -149,6 +154,12 @@ async function betView(event, user) {
       [...bets.partsOf(event), "fastest", "dnf", "answer", "joker"].map((p) => [
         p,
         bets.closesAt(event, p),
+      ]),
+    ),
+    opens: Object.fromEntries(
+      [...bets.partsOf(event), "fastest", "dnf", "answer", "joker"].map((p) => [
+        p,
+        bets.opensAt(event, p, prevRace(event)),
       ]),
     ),
     question: { ...bets.questionOf(event), answer: bets.answerOf(bets.questionOf(event).id, race) },
@@ -485,6 +496,8 @@ async function api(req, path) {
         state.bets[event.id][user.id],
         body,
         (season?.drivers ?? []).map((d) => d.id),
+        Date.now(),
+        prevRace(event),
       );
       await save();
     }

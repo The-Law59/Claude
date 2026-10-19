@@ -32,6 +32,7 @@ type BetView = {
   eventId: string;
   parts: Part[];
   closes: Record<string, number>;
+  opens: Record<string, number>;
   mine: Bet | null;
   score:
     | (Record<Part, PartScore> & {
@@ -167,7 +168,16 @@ function Weekend() {
       ?.name.split(" ")
       .at(-1) ?? "—";
   const teamColor = (id?: string) => team(season.drivers.find((d) => d.id === id)?.teamId ?? "");
-  const open = (part: string) => !!view && Date.now() < view.closes[part];
+  const open = (part: string) =>
+    !!view && Date.now() >= view.opens[part] && Date.now() < view.closes[part];
+  const status = (part: string) =>
+    !view
+      ? ""
+      : Date.now() < view.opens[part]
+        ? `Ouvre le ${formatDate(view.opens[part])}`
+        : open(part)
+          ? `Ouvert jusqu’au ${formatDate(view.closes[part])}`
+          : "Fermé";
   // Résultats masqués tant que la session est protégée par l'anti-spoil.
   const shown = (session: string) => !prefs.protectedSessions.includes(`${event.id}:${session}`);
 
@@ -257,7 +267,7 @@ function Weekend() {
                   {score ? `  ·  ${score.total} PTS` : ""}
                 </Text>
                 <Text style={s.small}>
-                  {open(part) ? `Ouvert jusqu’au ${formatDate(view.closes[part])}` : "Fermé"}
+                  {status(part)}
                   {real ? " · pronostic / réel / points" : ""}
                 </Text>
                 {Array.from({ length: PARTS[part].size }, (_, i) => (
@@ -298,6 +308,7 @@ function Weekend() {
 
           <View style={s.card}>
             <Text style={s.label}>BONUS COURSE</Text>
+            <Text style={s.small}>{status("fastest")}</Text>
             <Pressable
               accessibilityRole="button"
               disabled={!open("fastest")}
@@ -352,6 +363,7 @@ function Weekend() {
                 : ""}
             </Text>
             <Text style={s.text}>{view.question.text}</Text>
+            <Text style={s.small}>{status("answer")}</Text>
             {open("answer") ? (
               <Pills
                 options={[
@@ -377,6 +389,7 @@ function Weekend() {
               Un seul par saison : tous les points de ce week-end comptent double. À poser avant la
               première session pariée.
             </Text>
+            {!view.jokerOn && <Text style={s.small}>{status("joker")}</Text>}
             {view.jokerOn ? (
               <Text style={s.text}>Joker déjà posé sur {view.jokerOn}.</Text>
             ) : open("joker") ? (
@@ -398,7 +411,9 @@ function Weekend() {
             Barème par case : place exacte {POINTS.exact} pts · à une place près {POINTS.close} pts
             · dans le top mais mal placé {POINTS.inTop} pts · sans-faute +{POINTS.perfect}. Meilleur
             tour {POINTS.fastest} pts. Abandons : exact {POINTS.dnfExact} pts, à 1 près{" "}
-            {POINTS.dnfClose} pts. Question {POINTS.question} pts. Joker : total ×2.
+            {POINTS.dnfClose} pts. Question {POINTS.question} pts. Joker : total ×2. Ouverture :
+            qualifs, sprint et joker le lundi qui suit le GP précédent ; course, meilleur tour,
+            abandons et question 1 h après le début des qualifs.
           </Text>
 
           {view.friends.length > 0 && (

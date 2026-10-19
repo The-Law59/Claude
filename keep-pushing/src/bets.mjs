@@ -1,6 +1,8 @@
 // Paris par week-end, façon tableau : top 10 des qualifs, top 10 de la course,
 // top 8 du sprint, meilleur tour et nombre d'abandons. Chaque partie ferme au
 // départ de sa session. Points par case selon l'écart à la vraie place.
+// Ouverture : qualifs, sprint et joker le lundi qui suit le GP précédent ;
+// course, meilleur tour, abandons et question 1 h après le début des qualifs.
 // En plus : une question oui/non par week-end et un joker (points x2) par saison.
 import { fail } from "./errors.mjs";
 
@@ -62,13 +64,31 @@ export const closesAt = (event, part) =>
   part === "joker"
     ? Math.min(...partsOf(event).map((p) => closesAt(event, p)))
     : start(event, PARTS[part]?.session ?? EXTRAS[part]);
-export const isOpen = (event, part, now = Date.now()) => now < closesAt(event, part);
+
+const AFTER_QUALI = ["race", "fastest", "dnf", "answer", "question"];
+// Lundi 0 h (UTC) qui suit une date.
+export function mondayAfter(t) {
+  const d = new Date(t);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.getTime() + ((8 - d.getUTCDay()) % 7 || 7) * 86400000;
+}
+// prevRace : départ de la course du GP précédent (null pour le premier GP).
+export function opensAt(event, part, prevRace = null) {
+  const quali = start(event, "Qualifying");
+  if (AFTER_QUALI.includes(part) && quali !== null) return quali + 3600000;
+  return prevRace === null ? 0 : mondayAfter(prevRace);
+}
+export const isOpen = (event, part, now = Date.now(), prevRace = null) =>
+  now >= opensAt(event, part, prevRace) && now < closesAt(event, part);
+const isClosed = (event, part, now) => now >= closesAt(event, part);
 
 // Fusionne un pari reçu avec le précédent : les parties fermées ne bougent plus.
-export function mergeBet(event, prev = {}, body, driverIds, now = Date.now()) {
+// Les parties pas encore ouvertes sont ignorées de la même façon.
+export function mergeBet(event, prev = {}, body, driverIds, now = Date.now(), prevRace = null) {
   const bet = { ...prev };
+  const canEdit = (part) => isOpen(event, part, now, prevRace);
   for (const part of partsOf(event)) {
-    if (!isOpen(event, part, now) || !(part in (body ?? {}))) continue;
+    if (!canEdit(part) || !(part in (body ?? {}))) continue;
     const list = body[part];
     if (list === null || (Array.isArray(list) && list.length === 0)) delete bet[part];
     else if (
@@ -80,17 +100,17 @@ export function mergeBet(event, prev = {}, body, driverIds, now = Date.now()) {
       bet[part] = list;
     else fail(400, `Classement incomplet ou pilote en double (${part}).`);
   }
-  if (isOpen(event, "fastest", now) && body && "fastest" in body) {
+  if (canEdit("fastest") && body && "fastest" in body) {
     if (body.fastest === null) delete bet.fastest;
     else if (driverIds.includes(body.fastest)) bet.fastest = body.fastest;
     else fail(400, "Pilote inconnu (meilleur tour).");
   }
-  if (isOpen(event, "dnf", now) && body && "dnf" in body) {
+  if (canEdit("dnf") && body && "dnf" in body) {
     if (body.dnf === null) delete bet.dnf;
     else if (Number.isInteger(body.dnf) && body.dnf >= 0 && body.dnf <= 22) bet.dnf = body.dnf;
     else fail(400, "Nombre d'abandons : entre 0 et 22.");
   }
-  if (isOpen(event, "answer", now) && body && "answer" in body) {
+  if (canEdit("answer") && body && "answer" in body) {
     if (body.answer === null) delete bet.answer;
     else if (typeof body.answer === "boolean") {
       bet.answer = body.answer;
@@ -99,7 +119,7 @@ export function mergeBet(event, prev = {}, body, driverIds, now = Date.now()) {
   }
   // Joker : à poser avant la première session du week-end. Le serveur
   // vérifie qu'il n'y en a qu'un par saison.
-  if (isOpen(event, "joker", now) && body && "joker" in body) {
+  if (canEdit("joker") && body && "joker" in body) {
     if (body.joker === true) bet.joker = true;
     else delete bet.joker;
   }
@@ -165,7 +185,7 @@ export function scoreBet(bet, results) {
 // Ce qu'on voit d'un pari d'un autre joueur : seulement les parties fermées.
 export function visibleBet(event, bet, now = Date.now()) {
   return Object.fromEntries(
-    Object.entries(bet).filter(([k]) => k !== "at" && !isOpen(event, k, now)),
+    Object.entries(bet).filter(([k]) => k !== "at" && isClosed(event, k, now)),
   );
 }
 
