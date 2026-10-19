@@ -151,6 +151,16 @@ function Weekend() {
   const [slot, setSlot] = useState<{ part: Part | "fastest"; i: number } | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [fillNotice, setFillNotice] = useState("");
+  // Mes paris du GP précédent, pour pré-remplir.
+  const [prevBet, setPrevBet] = useState<Bet | null>(null);
+  useEffect(() => {
+    setPrevBet(null);
+    if (index > 0)
+      call(`/api/bets/${events[index - 1].id}`)
+        .then((v: BetView) => setPrevBet(v.mine))
+        .catch(() => {});
+  }, [index, call]);
 
   const load = useCallback(() => {
     setView(null);
@@ -166,6 +176,7 @@ function Weekend() {
   useEffect(() => {
     setSlot(null);
     setNotice("");
+    setFillNotice("");
   }, [event.id]);
 
   const name = (id?: string) =>
@@ -202,6 +213,57 @@ function Weekend() {
     setDraft({ ...draft, [part]: list });
     const empty = list.findIndex((x) => !x);
     setSlot(empty === -1 ? null : { part, i: empty });
+  };
+
+  // Pré-remplissage : sources possibles pour une partie, de la plus utile à
+  // la moins utile. Chaque source donne une liste complète et sans doublon.
+  const standings = season.drivers.map((d) => d.id);
+  const complete = (list: string[] | undefined, size: number) => {
+    if (!list?.length) return null;
+    const known = list.filter((id) => standings.includes(id));
+    const rest = standings.filter((id) => !known.includes(id));
+    return [...new Set([...known, ...rest])].slice(0, size);
+  };
+  const sources = (part: Part): [string, string[]][] => {
+    const size = PARTS[part].size;
+    const quali = shown("Qualifying") ? view?.results.Qualifying : undefined;
+    const out: [string, string[] | null][] = [
+      ["🏁 Grille des qualifs", part === "quali" ? null : complete(quali, size)],
+      ["📝 Mon top des qualifs", part === "race" ? complete(draft.quali, size) : null],
+      ["↺ Mon prono du GP précédent", complete(prevBet?.[part] ?? prevBet?.race, size)],
+      ["🏆 Classement du championnat", complete(standings, size)],
+    ];
+    return out.filter((x): x is [string, string[]] => !!x[1]);
+  };
+  const fill = (part: Part, list: string[], label: string) => {
+    setDraft((d) => ({ ...d, [part]: list }));
+    setSlot(null);
+    setFillNotice(
+      `${LABELS[part]} pré-rempli (${label.slice(2).toLowerCase()}). Ajustez en touchant deux cases pour les échanger, puis enregistrez.`,
+    );
+  };
+  const fillAll = () => {
+    const parts = view!.parts.filter((p) => open(p) && !(draft[p] ?? []).some(Boolean));
+    if (!parts.length) return setFillNotice("Tous les tableaux ouverts sont déjà remplis.");
+    const next = { ...draft };
+    for (const p of parts) next[p] = sources(p)[0][1];
+    setDraft(next);
+    setSlot(null);
+    setFillNotice(
+      `${parts.map((p) => LABELS[p]).join(", ")} pré-rempli(s). Ajustez puis enregistrez.`,
+    );
+  };
+  // Toucher une case puis une autre de la même grille : les deux pilotes échangent.
+  const tapSlot = (part: Part, i: number) => {
+    const list = draft[part];
+    if (slot && slot.part === part && slot.i !== i && list?.[slot.i] && list?.[i]) {
+      const next = [...list];
+      [next[slot.i], next[i]] = [next[i], next[slot.i]];
+      setDraft({ ...draft, [part]: next });
+      setSlot(null);
+      return;
+    }
+    setSlot({ part, i });
   };
 
   const save = async () => {
@@ -261,6 +323,10 @@ function Weekend() {
               {sc.joker ? "  (joker ×2)" : ""}
             </Text>
           )}
+          {parts.some((p) => open(p) && !(draft[p] ?? []).some(Boolean)) && (
+            <Button label="⚡ Tout pré-remplir en un geste" onPress={fillAll} />
+          )}
+          {!!fillNotice && <Text style={s.small}>{fillNotice}</Text>}
           {parts.map((part) => {
             const session = PARTS[part].session;
             const real = shown(session) ? view.results[session as "Race"] : undefined;
@@ -281,7 +347,7 @@ function Weekend() {
                     key={i}
                     accessibilityRole="button"
                     disabled={!open(part)}
-                    onPress={() => setSlot({ part, i })}
+                    onPress={() => tapSlot(part, i)}
                     style={[s.rank, slot?.part === part && slot.i === i && s.mine]}
                   >
                     <Text style={[s.position, { width: 28 }]}>{i + 1}</Text>
@@ -307,7 +373,39 @@ function Weekend() {
                 {score?.bonus ? (
                   <Text style={s.small}>Bonus sans-faute : +{score.bonus}</Text>
                 ) : null}
-                {slot?.part === part && <DriverPicker onPick={choose} />}
+                {slot?.part === part && (
+                  <>
+                    {!!list[slot.i] && (
+                      <Text style={s.small}>
+                        Touchez une autre case pour échanger, ou choisissez un pilote :
+                      </Text>
+                    )}
+                    <DriverPicker onPick={choose} />
+                  </>
+                )}
+                {open(part) && (
+                  <View style={[s.pills, { marginVertical: 0 }]}>
+                    {sources(part).map(([label, list]) => (
+                      <Pressable
+                        key={label}
+                        accessibilityRole="button"
+                        onPress={() => fill(part, list, label)}
+                        style={[s.pill, { paddingVertical: 8, minHeight: 36 }]}
+                      >
+                        <Text style={s.small}>{label}</Text>
+                      </Pressable>
+                    ))}
+                    {list.some(Boolean) && (
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => setDraft({ ...draft, [part]: [] })}
+                        style={[s.pill, { paddingVertical: 8, minHeight: 36 }]}
+                      >
+                        <Text style={s.small}>✕ Vider</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                )}
               </View>
             );
           })}
