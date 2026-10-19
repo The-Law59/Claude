@@ -69,6 +69,24 @@ docker compose run --rm keep-pushing cp data/backups/game-AAAA-MM-JJ.json data/g
 docker compose start
 ```
 
+## Surveillance
+
+- `curl http://<IP du conteneur>:3000/api/health` : état du serveur (saison,
+  actus, sauvegarde, version, durée de fonctionnement). `docker ps` affiche
+  aussi `healthy` / `unhealthy`.
+- Les plantages de l'appli et du serveur arrivent dans Réglages → Tableau de
+  bord admin (et une notification aux admins à chaque nouvelle erreur).
+- Être prévenu si le serveur tombe : lancez Uptime Kuma, fourni dans le
+  même fichier, puis ouvrez `http://<IP du conteneur>:3001` :
+  ```bash
+  cd /opt/keep-pushing/keep-pushing && docker compose --profile monitoring up -d
+  ```
+  Ajoutez une sonde « HTTP(s) » sur `http://keep-pushing:3000/api/health`
+  (toutes les minutes) et une notification (Telegram, e-mail, Discord…).
+  Pour surveiller aussi le conteneur Proxmox lui-même, installez plutôt Uptime
+  Kuma sur une autre machine (ou un service gratuit comme UptimeRobot si le
+  serveur est accessible depuis Internet).
+
 Mot de passe oublié par un joueur : l'app s'arrête une minute, le temps de
 lui en générer un nouveau (affiché à l'écran, à lui transmettre) :
 ```bash

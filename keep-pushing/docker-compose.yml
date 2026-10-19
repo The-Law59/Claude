@@ -10,5 +10,16 @@ services:
     volumes:
       - translations:/app/data
     restart: unless-stopped
+  # Surveillance (optionnelle) : docker compose --profile monitoring up -d
+  # puis http://<IP du conteneur>:3001 pour créer l'alerte sur /api/health.
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    profiles: ["monitoring"]
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime:/app/data
+    restart: unless-stopped
 volumes:
   translations:
+  uptime:

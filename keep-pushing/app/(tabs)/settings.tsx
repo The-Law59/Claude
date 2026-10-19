@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { api, hasApi } from "../../src/api.mjs";
 import { protectWeekend, setProtected } from "../../src/model.mjs";
 import { syncReminders } from "../../src/reminders";
@@ -13,6 +13,16 @@ export default function Settings() {
   const [notice, setNotice] = useState("");
   const busy = useRef(false);
   const router = useRouter();
+  // Lien vers le tableau de bord pour les admins.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!prefs.account || !hasApi()) return setIsAdmin(false);
+      api("/api/me", { token: prefs.account.token })
+        .then((me) => setIsAdmin(!!me.admin))
+        .catch(() => setIsAdmin(false));
+    }, [prefs.account?.token]),
+  );
   const logout = () => {
     api("/api/logout", { method: "POST", token: prefs.account?.token }).catch(() => {});
     update({ account: null });
@@ -49,6 +59,17 @@ export default function Settings() {
                 Favoris, anti-spoil, filtres d’actus et thème suivent votre compte sur tous vos
                 téléphones.
               </Text>
+              <Button
+                label="⚙️ Mon compte (pseudo, mot de passe, données)"
+                onPress={() => router.push("/account")}
+              />
+              {isAdmin && (
+                <Button
+                  label="📊 Tableau de bord admin"
+                  secondary
+                  onPress={() => router.push("/admin")}
+                />
+              )}
               <Button label="Se déconnecter" secondary onPress={logout} />
             </>
           ) : (

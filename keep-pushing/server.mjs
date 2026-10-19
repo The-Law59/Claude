@@ -11,16 +11,28 @@ import { fetchFeeds } from "./src/news.mjs";
 import { loadRound, loadSeason } from "./src/jolpica.mjs";
 import { createTranslator } from "./src/translate.mjs";
 import * as accounts from "./src/accounts.mjs";
+import * as account from "./src/account.mjs";
 import * as bets from "./src/bets.mjs";
 import * as leagues from "./src/leagues.mjs";
 import * as seasons from "./src/seasons.mjs";
 import * as community from "./src/community.mjs";
 import * as notify from "./src/notify.mjs";
+import * as admin from "./src/admin.mjs";
+import * as monitor from "./src/monitor.mjs";
 import { exactCount, highlights } from "./src/recap.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
 const DATA = join(import.meta.dirname, "data");
 const PORT = Number(process.env.PORT) || 3000;
+const STARTED = Date.now();
+// Pseudos admins (avis, modération du forum) : ADMINS=Quentin,Lucas dans .env.
+const ADMINS = community.parseAdmins(process.env.ADMINS);
+// Version de l'app : package.app.json dans l'image Docker, sinon package.json.
+const readVersion = (file) =>
+  readFile(join(import.meta.dirname, file), "utf8").then((t) => JSON.parse(t).version);
+const VERSION = await readVersion("package.app.json")
+  .catch(() => readVersion("package.json"))
+  .catch(() => "?");
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript",
@@ -118,14 +130,50 @@ const state = JSON.parse(
 );
 const failures = new Map();
 let saving = Promise.resolve();
+let saveError = null;
 const save = () =>
   (saving = saving
     .then(() => mkdir(DATA, { recursive: true }))
     .then(() => writeFile(GAME, JSON.stringify(state)))
-    .catch((e) => console.warn(`Jeu non sauvegardé : ${e.message}`)));
+    .then(() => (saveError = null))
+    .catch((e) => {
+      saveError = e.message;
+      console.warn(`Jeu non sauvegardé : ${e.message}`);
+    }));
+// Dernières visites (tableau de bord) : sauvegardées toutes les 10 min.
+setInterval(save, 10 * 60 * 1000);
+
+// Erreur (appli ou serveur) : enregistrée ; la première fois, les admins
+// reçoivent une notification.
+function reportError(details) {
+  const { entry, fresh } = monitor.recordError(state, details);
+  console.warn(`Erreur ${entry.source} (${entry.where || "?"}) : ${entry.message}`);
+  if (fresh)
+    for (const u of Object.values(state.users))
+      if (community.isAdmin(u, ADMINS))
+        notify.notify(state, u.id, {
+          key: `error:${entry.signature}`,
+          text: (n) =>
+            `⚠ Nouvelle erreur ${entry.source === "app" ? "dans l'appli" : "serveur"} : ${entry.message.split("\n")[0].slice(0, 80)}`,
+          link: "/admin",
+        });
+  save();
+}
+process.on("unhandledRejection", (e) =>
+  reportError({
+    source: "server",
+    message: String(e?.message ?? e),
+    stack: e?.stack,
+    where: "promesse",
+  }),
+);
+process.on("uncaughtException", async (e) => {
+  reportError({ source: "server", message: e.message, stack: e.stack, where: "processus" });
+  await saving;
+  process.exit(1); // Docker relance le conteneur (restart: unless-stopped)
+});
+const allowReport = monitor.rateLimiter();
 state.final ??= {};
-// Pseudos admins (avis, modération du forum) : ADMINS=Quentin,Lucas dans .env.
-const ADMINS = community.parseAdmins(process.env.ADMINS);
 state.champions ??= {};
 
 // Copie quotidienne de game.json dans data/backups/, 14 jours gardés.
@@ -368,7 +416,54 @@ async function api(req, path) {
     if (!news) await firstNews;
     return [news ? 200 : 503, news ?? []];
   }
-  const auth = () => accounts.authenticate(state, req.headers.authorization);
+  const auth = () => {
+    const user = accounts.authenticate(state, req.headers.authorization);
+    user.lastSeen = Date.now();
+    return user;
+  };
+  const adminOnly = () => {
+    const user = auth();
+    if (!community.isAdmin(user, ADMINS)) throw new accounts.GameError(403, "Réservé aux admins.");
+    return user;
+  };
+  // --- Santé et erreurs (sans compte : l'appli peut planter avant connexion).
+  if (path === "/api/health") {
+    const h = monitor.health({ startedAt: STARTED, version: VERSION, season, news, saveError });
+    return [h.ok ? 200 : 503, h];
+  }
+  if (path === "/api/errors" && req.method === "POST") {
+    if (!allowReport(req.socket.remoteAddress)) return [429, { error: "Trop de rapports." }];
+    const body = await readJson(req);
+    reportError({ ...body, source: "app" });
+    return [201, { ok: true }];
+  }
+  // --- Tableau de bord des admins.
+  if (path === "/api/admin/stats") {
+    adminOnly();
+    return [
+      200,
+      {
+        ...admin.stats(state, { events: season?.events ?? [] }),
+        health: monitor.health({ startedAt: STARTED, version: VERSION, season, news, saveError }),
+        latestErrors: (state.errors ?? []).slice(0, 20),
+      },
+    ];
+  }
+  const exportRoute = path.match(/^\/api\/admin\/export\/(\w+)$/);
+  if (exportRoute) {
+    adminOnly();
+    const all = await allRounds();
+    const current = Object.fromEntries(
+      Object.entries(all).filter(([key]) => seasons.seasonOf(key) === seasonId()),
+    );
+    const totals = Object.fromEntries(
+      bets.leaderboard(Object.keys(state.users), current).map((r) => [r.id, r.points]),
+    );
+    const csv = admin.exportCsv(state, exportRoute[1], { points: (id) => totals[id] ?? 0 });
+    if (csv === null) return [404, { error: "Export inconnu." }];
+    const day = new Date().toISOString().slice(0, 10);
+    return [200, { filename: `keep-pushing-${exportRoute[1]}-${day}.csv`, csv }];
+  }
   const changed = async (result) => (await save(), result);
   if (path === "/api/register" && req.method === "POST")
     return [201, await changed(await accounts.register(state, await readJson(req)))];
@@ -377,6 +472,18 @@ async function api(req, path) {
   if (path === "/api/logout" && req.method === "POST") {
     accounts.logout(state, req.headers.authorization);
     return [200, await changed({})];
+  }
+  // --- Mon compte : mot de passe, pseudo, export, suppression.
+  if (path === "/api/account/password" && req.method === "POST") {
+    await account.changePassword(state, auth(), await readJson(req), req.headers.authorization);
+    return [200, await changed({ ok: true })];
+  }
+  if (path === "/api/account/pseudo" && req.method === "POST")
+    return [200, await changed(await account.changePseudo(state, auth(), await readJson(req)))];
+  if (path === "/api/account/export") return [200, account.exportData(state, auth())];
+  if (path === "/api/account/delete" && req.method === "POST") {
+    await account.deleteAccount(state, auth(), await readJson(req));
+    return [200, await changed({ deleted: true })];
   }
   if (path === "/api/me") {
     const user = auth();
@@ -576,7 +683,7 @@ createServer(async (req, res) => {
           ? [204, ""] // pré-vol CORS
           : await api(req, path).catch((e) => {
               if (e instanceof accounts.GameError) return [e.status, { error: e.message }];
-              console.warn(`API ${path} : ${e.message}`);
+              reportError({ source: "server", message: e.message, stack: e.stack, where: path });
               return [502, { error: "Erreur du serveur." }];
             });
       res.writeHead(status, {

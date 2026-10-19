@@ -22,9 +22,15 @@ function credentials(body) {
   return { pseudo, password };
 }
 
-async function hashPassword(password, salt) {
+export async function hashPassword(password, salt) {
   return (await derive(password, salt, 64)).toString("hex");
 }
+export async function checkPassword(user, password) {
+  const hash = await hashPassword(typeof password === "string" ? password : "", user.salt);
+  return timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(user.hash, "hex"));
+}
+export const PSEUDO_RULE = PSEUDO;
+export const sessionHash = sha;
 
 function openSession(state, user, rand) {
   const token = rand(32).toString("base64url");
