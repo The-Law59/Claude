@@ -30,7 +30,13 @@ export default function Notifications() {
           style={[s.card, !n.read && { borderWidth: 2, borderColor: c.accent }]}
         >
           <Text style={[s.text, !n.read && { fontWeight: "700" }]}>
-            {n.key.startsWith("forum:") ? "💬 " : "🏁 "}
+            {n.key.startsWith("forum:")
+              ? "💬 "
+              : n.key.startsWith("friend:")
+                ? "👥 "
+                : n.key.startsWith("error:")
+                  ? "⚠ "
+                  : "🏁 "}
             {noticeText(n, prefs)}
           </Text>
           <Text style={s.small}>{formatDate(n.at)}</Text>

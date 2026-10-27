@@ -19,6 +19,8 @@ import * as community from "./src/community.mjs";
 import * as notify from "./src/notify.mjs";
 import * as admin from "./src/admin.mjs";
 import * as monitor from "./src/monitor.mjs";
+import { createPracticeSource, isPractice } from "./src/practice.mjs";
+import * as ads from "./src/ads.mjs";
 import { exactCount, highlights } from "./src/recap.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
@@ -173,6 +175,23 @@ process.on("uncaughtException", async (e) => {
   process.exit(1); // Docker relance le conteneur (restart: unless-stopped)
 });
 const allowReport = monitor.rateLimiter();
+
+// Essais libres : fournisseur sous licence configuré dans .env (sinon null).
+const practiceSource = createPracticeSource({
+  provider: process.env.PRACTICE_PROVIDER,
+  apiKey: process.env.PRACTICE_API_KEY,
+});
+const practiceCache = new Map(); // sessionId -> { rows, at }
+
+// Clés publiques AdMob (vérification des récompenses), gardées 24 h.
+let admobCache = { keys: {}, at: 0 };
+async function admobKeys() {
+  if (Date.now() - admobCache.at > 24 * 3600000) {
+    const res = await fetch(ads.ADMOB_KEYS_URL);
+    admobCache = { keys: ads.parseKeys(await res.json()), at: Date.now() };
+  }
+  return admobCache.keys;
+}
 state.final ??= {};
 state.champions ??= {};
 
@@ -224,6 +243,11 @@ async function betView(event, user) {
           .filter(([, rows]) => rows?.length)
           .map(([t, rows]) => [t, rows.map((x) => x.driverId)]),
       ),
+      // Qualifs : grille officielle (pénalités) dès la course publiée.
+      ...(bets.qualiReference(r).grid && {
+        Qualifying: bets.qualiReference(r).rows.map((x) => x.driverId),
+      }),
+      qualiGrid: bets.qualiReference(r).grid,
       fastest: race?.find((x) => x.fastestLap)?.driverId ?? null,
       dnf: race?.length ? bets.dnfCount(race) : null,
     },
@@ -238,8 +262,13 @@ async function betView(event, user) {
   };
 }
 
+// GP où le joker gratuit de la saison est posé (les jokers gagnés par les
+// pubs ne comptent pas).
 const jokerEvent = (user, event) =>
-  season?.events.find((e) => e.id !== event.id && state.bets[e.id]?.[user.id]?.joker);
+  season?.events.find((e) => {
+    const b = state.bets[e.id]?.[user.id];
+    return e.id !== event.id && b?.joker && b.jokerSource !== "ads";
+  });
 
 const seasonId = () => season?.events[0]?.season;
 const seasonDone = () => !!season && !!rounds.get(season.events.at(-1).id)?.final;
@@ -437,6 +466,51 @@ async function api(req, path) {
     reportError({ ...body, source: "app" });
     return [201, { ok: true }];
   }
+  const practice = path.match(/^\/api\/practice\/([\w-]+):(\w+)$/);
+  if (practice) {
+    const [, eventId, type] = practice;
+    const event = findEvent(eventId);
+    if (!event || !isPractice(type)) return [404, { error: "Session inconnue." }];
+    if (!practiceSource) return [200, { available: false, rows: [] }];
+    const key = `${eventId}:${type}`;
+    const hit = practiceCache.get(key);
+    // Résultats gardés 6 h (ils ne bougent plus après la séance).
+    if (!hit || Date.now() - hit.at > 6 * 3600000)
+      practiceCache.set(key, {
+        rows: await practiceSource(event, type, season.drivers),
+        at: Date.now(),
+      });
+    return [200, { available: true, rows: practiceCache.get(key).rows }];
+  }
+  // --- Pubs récompensées (désactivées tant que ADS_ENABLED n'est pas à 1).
+  if (path.startsWith("/api/ads/")) {
+    if (process.env.ADS_ENABLED !== "1") return [404, { error: "Pubs désactivées." }];
+    if (path === "/api/ads/admob-ssv") {
+      // Appel de Google : signature vérifiée avec ses clés publiques.
+      const query = new URL(req.url, "http://x").search.slice(1);
+      const reward = ads.verifySsv(query, await admobKeys());
+      if (!reward || !state.users[reward.userId] || !findEvent(reward.eventId))
+        return [400, { error: "Récompense invalide." }];
+      ads.recordReward(state, reward);
+      await save();
+      return [200, { ok: true }];
+    }
+    if (path === "/api/ads/status") {
+      const user = auth();
+      const event = findEvent(new URL(req.url, "http://x").searchParams.get("event"));
+      if (!event) return [404, { error: "Grand Prix inconnu." }];
+      const watched = ads.adsWatched(state, user.id, event.id);
+      return [
+        200,
+        {
+          freeJokerUsedOn: jokerEvent(user, event)?.name ?? null,
+          watched,
+          needed: ads.ADS_PER_JOKER,
+          unlocked: watched >= ads.ADS_PER_JOKER,
+        },
+      ];
+    }
+  }
   // --- Tableau de bord des admins.
   if (path === "/api/admin/stats") {
     adminOnly();
@@ -544,7 +618,11 @@ async function api(req, path) {
   }
   if (path === "/api/friends" && req.method === "POST") {
     const user = auth();
-    accounts.addFriend(state, user, (await readJson(req)).pseudo);
+    const { pseudo } = await readJson(req);
+    const already = new Set(user.friends);
+    accounts.addFriend(state, user, pseudo);
+    const added = user.friends.find((id) => !already.has(id));
+    if (added) notify.notifyFriend(state, user, state.users[added]);
     return [200, await changed(accounts.friendsView(state, user))];
   }
   const friend = path.match(/^\/api\/friends\/([\w-]+)$/);
@@ -656,8 +734,13 @@ async function api(req, path) {
     if (!event) return [404, { error: "Grand Prix inconnu." }];
     if (req.method === "PUT") {
       const body = await readJson(req);
-      const other = body?.joker === true && jokerEvent(user, event);
-      if (other) return [409, { error: `Joker déjà posé sur ${other.name}.` }];
+      // Joker : le gratuit, sinon celui débloqué par 3 pubs sur ce GP.
+      const source =
+        body?.joker === true
+          ? ads.jokerSource(state, user.id, event.id, jokerEvent(user, event))
+          : null;
+      if (body?.joker === true && !source)
+        return [409, { error: `Joker déjà posé sur ${jokerEvent(user, event).name}.` }];
       state.bets[event.id] ??= {};
       state.bets[event.id][user.id] = bets.mergeBet(
         event,
@@ -667,6 +750,9 @@ async function api(req, path) {
         Date.now(),
         prevRace(event),
       );
+      const saved = state.bets[event.id][user.id];
+      if (saved.joker && source) saved.jokerSource = source;
+      if (!saved.joker) delete saved.jokerSource;
       await save();
     }
     return [200, await betView(event, user)];

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -11,10 +11,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
-import { api } from "./api.mjs";
+import { api, hasApi } from "./api.mjs";
 import { articleVisible, setProtected } from "./model.mjs";
 import { DEFAULT_ACCENT, accentFor, mix, readableOn, tint } from "./teams.mjs";
-import { useStore } from "./store";
+import { type Row, useStore } from "./store";
 
 const light = {
   bg: "#f5f6f8",
@@ -158,6 +158,7 @@ export function Screen({ children }: { children: React.ReactNode }) {
   const { c, s, dark } = useTheme();
   const { prefs, season, error, inbox } = useStore();
   const router = useRouter();
+  const friendRequests = inbox.items.filter((n) => !n.read && n.key.startsWith("friend:")).length;
   const protectedAny = prefs.protectedSessions.length > 0;
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
@@ -173,9 +174,22 @@ export function Screen({ children }: { children: React.ReactNode }) {
           {!!prefs.account && (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={`Amis : ${friendRequests} nouveauté(s)`}
+              onPress={() => router.push("/friends")}
+              style={[s.shield, { minWidth: 52 }]}
+            >
+              <Text style={{ color: c.ink }}>👥</Text>
+              <Text style={[s.tiny, friendRequests > 0 && { color: c.accent, fontWeight: "700" }]}>
+                {friendRequests > 0 ? `${friendRequests} nouv.` : "Amis"}
+              </Text>
+            </Pressable>
+          )}
+          {!!prefs.account && (
+            <Pressable
+              accessibilityRole="button"
               accessibilityLabel={`Notifications : ${inbox.unread} non lue(s)`}
               onPress={() => router.push("/notifications")}
-              style={s.shield}
+              style={[s.shield, { minWidth: 52 }]}
             >
               <Text style={{ color: c.ink }}>🔔</Text>
               <Text style={[s.tiny, inbox.unread > 0 && { color: c.accent, fontWeight: "700" }]}>
@@ -243,6 +257,18 @@ export function SourceBadge({
 
 // Classement d'une session, ou verrou si elle est protégée.
 export function ResultRows({ sessionId }: { sessionId: string }) {
+  // Essais libres : servis par le serveur s'il a un fournisseur configuré.
+  const [extra, setExtra] = useState<Row[] | undefined>(undefined);
+  const [extraState, setExtraState] = useState<"idle" | "loading" | "done">("idle");
+  useEffect(() => {
+    setExtra(undefined);
+    if (!hasApi() || !/:(First|Second|Third)Practice$|:SprintQualifying$/.test(sessionId)) return;
+    setExtraState("loading");
+    api(`/api/practice/${sessionId}`)
+      .then((d) => d.available && setExtra(d.rows))
+      .catch(() => {})
+      .finally(() => setExtraState("done"));
+  }, [sessionId]);
   const { c, s } = useTheme();
   const { prefs, setPrefs, season } = useStore();
   const router = useRouter();
@@ -263,14 +289,17 @@ export function ResultRows({ sessionId }: { sessionId: string }) {
         />
       </View>
     );
-  const rows = season.results[sessionId];
+  const session = season.events.flatMap((e) => e.sessions).find((x) => x.id === sessionId);
+  const practice = !!session && /Practice|SprintQualifying/.test(session.type);
+  const rows = season.results[sessionId] ?? extra;
   if (!rows?.length) {
-    const session = season.events.flatMap((e) => e.sessions).find((x) => x.id === sessionId);
     const message =
       !session || Date.parse(session.startsAt) > Date.now()
         ? "Session à venir."
-        : /Practice|SprintQualifying/.test(session.type)
-          ? "Pas de classement disponible pour cette session."
+        : practice
+          ? extraState === "loading"
+            ? "Chargement des résultats…"
+            : "Résultats des essais pas encore disponibles dans Keep Pushing : notre source de données actuelle ne les publie pas. Ils arriveront avec une source officielle."
           : "Chargement des résultats…";
     return (
       <View style={s.card}>

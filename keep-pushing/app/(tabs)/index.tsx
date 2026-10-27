@@ -271,7 +271,10 @@ function MyBets({ eventId }: { eventId: string }) {
             Il vous manque : {missing.map((k) => TODO[k]).join(", ")}.
           </Text>
           <Text style={s.small}>Prochaine fermeture {when}.</Text>
-          <Button label="Compléter mes pronos →" onPress={() => router.navigate("/pronos")} />
+          <Button
+            label="🧭 Compléter mes pronos pas à pas →"
+            onPress={() => router.push(`/bet-wizard?event=${eventId}`)}
+          />
         </>
       ) : (
         <>

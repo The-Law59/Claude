@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as accounts from "../src/accounts.mjs";
 import {
   mergeBet, scoreBet, scoreList, visibleBet, leaderboard, partsOf, perRound, history,
-  questionOf, answerOf, closesAt, opensAt, mondayAfter, POINTS,
+  questionOf, answerOf, closesAt, opensAt, mondayAfter, qualiReference, POINTS,
 } from "../src/bets.mjs";
 import { createLeague, joinLeague, leaveLeague, leaguesOf, postMessage, deleteMessage, messagesOf } from "../src/leagues.mjs";
 import { championsCloseAt, mergeChampions, scoreChampions, standingsBySeason, backupName, backupsToDelete } from "../src/seasons.mjs";
@@ -254,4 +254,24 @@ test("Palmarès par saison et rotation des sauvegardes", () => {
   assert.equal(backupName(new Date("2026-10-16T08:00:00Z")), "game-2026-10-16.json");
   const names = Array.from({ length: 16 }, (_, i) => `game-2026-10-${String(i + 1).padStart(2, "0")}.json`);
   assert.deepEqual(backupsToDelete([...names, "autre.txt"]), ["game-2026-10-01.json", "game-2026-10-02.json"]);
+});
+
+test("Qualifs : provisoire sur le classement, puis grille officielle (pénalités)", () => {
+  const quali = ["d1", "d2", "d3", "d4"].map((driverId, i) => ({ driverId, position: i + 1 }));
+  // d1 pénalisé (5e sur la grille), d3 part des stands.
+  const race = [
+    { driverId: "d2", position: 1, grid: 1 },
+    { driverId: "d4", position: 2, grid: 2 },
+    { driverId: "d1", position: 3, grid: 3 },
+    { driverId: "d3", position: 4, grid: 0 },
+  ];
+  assert.deepEqual(qualiReference({ Qualifying: quali }), { rows: quali, grid: false });
+  const ref = qualiReference({ Qualifying: quali, Race: race });
+  assert.equal(ref.grid, true);
+  assert.deepEqual(ref.rows.map((r) => r.driverId), ["d2", "d4", "d1", "d3"]);
+  const bet = { quali: ["d1", "d2", "d3", "d4", ...Array.from({ length: 6 }, (_, i) => `x${i}`)] };
+  const before = scoreBet(bet, { Qualifying: quali });
+  const after = scoreBet(bet, { Qualifying: quali, Race: race });
+  assert.deepEqual(before.quali.slots.slice(0, 4), [10, 10, 10, 10]);
+  assert.deepEqual(after.quali.slots.slice(0, 4), [2, 5, 5, 2]); // corrigé avec la grille
 });

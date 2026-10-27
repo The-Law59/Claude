@@ -38,7 +38,7 @@ export type Prefs = {
   results: boolean;
 };
 export type Session = { id: string; type: string; label: string; startsAt: string };
-type Row = { position: number; driverId: string; name: string; team: string; value: string };
+export type Row = { position: number; driverId: string; name: string; team: string; value: string };
 export type Event = {
   id: string;
   competition: string;

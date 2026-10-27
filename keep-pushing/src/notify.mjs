@@ -89,3 +89,22 @@ export function notifyLeague(state, league, from, opts) {
     );
   }
 }
+
+// Demande d'ami (ou acceptation si l'autre vous avait déjà ajouté).
+export function notifyFriend(state, from, to, opts) {
+  if (!to || to.id === from.id) return;
+  const accepted = to.friends.includes(from.id);
+  notify(
+    state,
+    to.id,
+    {
+      key: `friend:${from.id}`,
+      text: () =>
+        accepted
+          ? `${from.pseudo} a accepté votre demande d'ami`
+          : `${from.pseudo} veut être votre ami`,
+      link: "/friends",
+    },
+    opts,
+  );
+}

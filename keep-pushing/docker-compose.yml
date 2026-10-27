@@ -7,6 +7,11 @@ services:
       # Clé lue depuis le fichier .env à côté de ce fichier (jamais commité).
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ADMINS: ${ADMINS:-}
+      # Résultats des essais libres (fournisseur sous licence, voir deploy/README.md).
+      PRACTICE_PROVIDER: ${PRACTICE_PROVIDER:-}
+      PRACTICE_API_KEY: ${PRACTICE_API_KEY:-}
+      # Joker regagné avec les pubs (1 pour activer, une fois l'appli sur les stores).
+      ADS_ENABLED: ${ADS_ENABLED:-}
     volumes:
       - translations:/app/data
     restart: unless-stopped

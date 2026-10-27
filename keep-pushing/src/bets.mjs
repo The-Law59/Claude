@@ -147,10 +147,23 @@ export const dnfCount = (rows) =>
 
 // results : { Qualifying?, Sprint?, Race? } (lignes Jolpica). Une partie sans
 // résultat publié vaut null.
+// Référence des qualifs : la grille de départ officielle (pénalités moteur,
+// exclusions…) dès que la course est publiée ; avant, le classement des
+// qualifs (points provisoires). Départ des stands (grille 0) en fin de grille.
+export function qualiReference(results) {
+  const race = results.Race;
+  if (!race?.length || !race.some((r) => r.grid > 0)) return { rows: results.Qualifying, grid: false };
+  const quali = Object.fromEntries((results.Qualifying ?? []).map((r) => [r.driverId, r.position]));
+  const order = [...race].sort(
+    (a, b) => (a.grid || 99) - (b.grid || 99) || (quali[a.driverId] ?? 99) - (quali[b.driverId] ?? 99),
+  );
+  return { rows: order.map((r, i) => ({ driverId: r.driverId, position: i + 1 })), grid: true };
+}
+
 export function scoreBet(bet, results) {
   const out = { total: 0 };
   for (const [part, { session, size }] of Object.entries(PARTS)) {
-    const rows = results[session];
+    const rows = session === "Qualifying" ? qualiReference(results).rows : results[session];
     out[part] = bet[part] && rows?.length ? scoreList(bet[part], rows, size) : null;
   }
   const race = results.Race;

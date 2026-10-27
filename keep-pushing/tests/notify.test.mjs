@@ -62,3 +62,16 @@ test("Récap : meilleurs coups et texte à partager", () => {
   assert.match(text, /📈 3e → 1er au général/);
   assert.match(text, /https:\/\/kp\.example/);
 });
+
+test("Demandes d'amis : notification de demande puis d'acceptation", async () => {
+  const { notifyFriend } = await import("../src/notify.mjs");
+  const a = { id: "a", pseudo: "Quentin", friends: ["b"] };
+  const b = { id: "b", pseudo: "Lucas", friends: [] };
+  const state = { users: { a, b } };
+  notifyFriend(state, a, b);
+  assert.equal(inbox(state, "b").items[0].text, "Quentin veut être votre ami");
+  assert.equal(inbox(state, "b").items[0].link, "/friends");
+  b.friends.push("a");
+  notifyFriend(state, b, a);
+  assert.equal(inbox(state, "a").items[0].text, "Lucas a accepté votre demande d'ami");
+});

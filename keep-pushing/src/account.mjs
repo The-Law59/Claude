@@ -99,5 +99,6 @@ export async function deleteAccount(state, user, body) {
     }
   }
   delete state.notifications?.[id];
+  delete state.adRewards?.[id];
   for (const f of state.feedback ?? []) if (f.userId === id) f.userId = null;
 }

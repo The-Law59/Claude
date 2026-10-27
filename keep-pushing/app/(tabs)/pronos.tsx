@@ -49,6 +49,7 @@ type BetView = {
   results: Partial<Record<"Qualifying" | "Sprint" | "Race", string[]>> & {
     fastest: string | null;
     dnf: number | null;
+    qualiGrid?: boolean;
   };
   friends: { pseudo: string; bet: Bet; score: number }[];
 };
@@ -78,8 +79,6 @@ type Boards = {
     leagues: { name: string; pseudo: string; points: number }[];
   }[];
 };
-type Person = { id: string; pseudo: string };
-type Friends = { me: Person; friends: Person[]; incoming: Person[]; outgoing: Person[] };
 
 const LABELS: Record<Part, string> = { quali: "Qualifications", sprint: "Sprint", race: "Course" };
 
@@ -87,7 +86,7 @@ export default function Pronos() {
   const { s } = useTheme();
   const { prefs, season } = useStore();
   const router = useRouter();
-  const [tab, setTab] = useState<"bet" | "rank" | "season" | "friends">("bet");
+  const [tab, setTab] = useState<"bet" | "rank" | "season">("bet");
   // Lien d'une notification de ligue : …/pronos?league=<id>.
   const { league } = useLocalSearchParams<{ league?: string }>();
   useEffect(() => {
@@ -125,7 +124,6 @@ export default function Pronos() {
           ["bet", "Mes paris"],
           ["rank", "Classements"],
           ["season", "Palmarès"],
-          ["friends", "Amis"],
         ]}
         value={tab}
         onChange={setTab}
@@ -133,7 +131,6 @@ export default function Pronos() {
       {tab === "bet" && <Weekend />}
       {tab === "rank" && <Rankings key={league} initial={league} />}
       {tab === "season" && <SeasonTab />}
-      {tab === "friends" && <FriendsTab />}
     </Screen>
   );
 }
@@ -141,6 +138,7 @@ export default function Pronos() {
 function Weekend() {
   const { s, c, team } = useTheme();
   const { season, prefs } = useStore();
+  const router = useRouter();
   const call = useCall();
   const events = season.events;
   const next = events.findIndex((e) => Date.parse(e.sessions.at(-1)!.startsAt) > Date.now());
@@ -317,14 +315,17 @@ function Weekend() {
         !error && <Text style={s.small}>Chargement…</Text>
       ) : (
         <>
-          {sc && sc.total > 0 && shown("Race") && (
-            <Text style={s.heading}>
-              Total du week-end : <Text style={{ color: c.accent }}>{sc.total} pts</Text>
-              {sc.joker ? "  (joker ×2)" : ""}
-            </Text>
+          {sc && (
+            <StepTotals score={sc} parts={parts} shown={shown} grid={!!view.results.qualiGrid} />
+          )}
+          {(parts.some(open) || open("fastest")) && (
+            <Button
+              label="🧭 Faire mes pronos pas à pas"
+              onPress={() => router.push(`/bet-wizard?event=${event.id}`)}
+            />
           )}
           {parts.some((p) => open(p) && !(draft[p] ?? []).some(Boolean)) && (
-            <Button label="⚡ Tout pré-remplir en un geste" onPress={fillAll} />
+            <Button label="⚡ Tout pré-remplir en un geste" secondary onPress={fillAll} />
           )}
           {!!fillNotice && <Text style={s.small}>{fillNotice}</Text>}
           {parts.map((part) => {
@@ -341,6 +342,11 @@ function Weekend() {
                 <Text style={s.small}>
                   {status(part)}
                   {real ? " · pronostic / réel / points" : ""}
+                  {real && part === "quali"
+                    ? view.results.qualiGrid
+                      ? " · grille officielle (pénalités)"
+                      : " · provisoire, corrigé avec la grille de départ"
+                    : ""}
                 </Text>
                 {Array.from({ length: PARTS[part].size }, (_, i) => (
                   <Pressable
@@ -361,11 +367,11 @@ function Weekend() {
                       <Text
                         style={[
                           s.time,
-                          { width: 44, textAlign: "right" },
+                          { width: 64, textAlign: "right" },
                           score.slots[i] >= POINTS.close && { color: c.accent },
                         ]}
                       >
-                        {score.slots[i] ? `+${score.slots[i]}` : "0"}
+                        {why(score.slots[i])}
                       </Text>
                     )}
                   </Pressable>
@@ -682,7 +688,9 @@ function Rankings({ initial }: { initial?: string }) {
               </View>
             ))}
             {scope === "friends" && (rows?.length ?? 0) <= 1 && (
-              <Text style={s.small}>Ajoutez des amis dans l’onglet Amis pour vous comparer.</Text>
+              <Text style={s.small}>
+                Ajoutez des amis avec le bouton 👥 en haut de l’écran pour vous comparer.
+              </Text>
             )}
           </View>
           {league && <LeagueChat id={league.id} />}
@@ -741,92 +749,6 @@ function Rankings({ initial }: { initial?: string }) {
             })
           }
         />
-      </View>
-    </>
-  );
-}
-
-function FriendsTab() {
-  const { s, c } = useTheme();
-  const call = useCall();
-  const [data, setData] = useState<Friends | null>(null);
-  const [pseudo, setPseudo] = useState("");
-  const [error, setError] = useState("");
-  const run = (p: Promise<Friends>) =>
-    p
-      .then((d) => {
-        setData(d);
-        setError("");
-      })
-      .catch((e) => setError(e.message));
-  useFocusEffect(useCallback(() => void run(call("/api/me")), [call]));
-  const add = (who: string) => run(call("/api/friends", { method: "POST", body: { pseudo: who } }));
-  const remove = (id: string) => run(call(`/api/friends/${id}`, { method: "DELETE" }));
-  const input = {
-    borderWidth: 1,
-    borderColor: c.line,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 16,
-    color: c.ink,
-    backgroundColor: c.card,
-  };
-  const Row = ({ p, children }: { p: Person; children: React.ReactNode }) => (
-    <View style={[s.rank, { gap: 8 }]}>
-      <Text style={[s.text, { flex: 1 }]}>{p.pseudo}</Text>
-      {children}
-    </View>
-  );
-  return (
-    <>
-      <View style={s.card}>
-        <Text style={s.text}>Ajouter un ami par son pseudo</Text>
-        <TextInput
-          style={input}
-          value={pseudo}
-          onChangeText={setPseudo}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="Pseudo"
-        />
-        <Button
-          label="Ajouter"
-          onPress={() => {
-            if (!pseudo.trim()) return;
-            add(pseudo).then(() => setPseudo(""));
-          }}
-        />
-        {!!error && <Text style={s.error}>{error}</Text>}
-      </View>
-      {!!data?.incoming.length && (
-        <>
-          <Text style={s.heading}>Demandes reçues</Text>
-          <View style={s.card}>
-            {data.incoming.map((p) => (
-              <Row key={p.id} p={p}>
-                <Button label="Accepter" onPress={() => add(p.pseudo)} />
-                <Button label="Refuser" secondary onPress={() => remove(p.id)} />
-              </Row>
-            ))}
-          </View>
-        </>
-      )}
-      <Text style={s.heading}>Mes amis</Text>
-      <View style={s.card}>
-        {data?.friends.map((p) => (
-          <Row key={p.id} p={p}>
-            <Button label="Retirer" secondary onPress={() => remove(p.id)} />
-          </Row>
-        ))}
-        {data?.outgoing.map((p) => (
-          <Row key={p.id} p={p}>
-            <Text style={s.small}>En attente</Text>
-            <Button label="Annuler" secondary onPress={() => remove(p.id)} />
-          </Row>
-        ))}
-        {data && !data.friends.length && !data.outgoing.length && (
-          <Text style={s.small}>Pas encore d’amis : ajoutez-les par leur pseudo.</Text>
-        )}
       </View>
     </>
   );
@@ -1161,6 +1083,73 @@ function Podium({ entry }: { entry: Boards["palmares"][number] }) {
           {entry.done ? "Champion" : "En tête"} de « {l.name} » : {l.pseudo} ({l.points} pts)
         </Text>
       ))}
+    </View>
+  );
+}
+
+// Explication d'une case : pourquoi elle rapporte ses points.
+const why = (p: number) =>
+  p === POINTS.exact ? "✓ +10" : p === POINTS.close ? "±1 +5" : p === POINTS.inTop ? "top +2" : "0";
+
+// Compte des points étape par étape (dans l'ordre des sessions), puis bonus
+// et joker : chaque ligne donne le gain et le total cumulé.
+function StepTotals({
+  score,
+  parts,
+  shown,
+  grid,
+}: {
+  score: NonNullable<BetView["score"]>;
+  parts: Part[];
+  shown: (session: string) => boolean;
+  grid: boolean;
+}) {
+  const { s, c } = useTheme();
+  const steps: [string, number][] = [];
+  for (const p of parts) {
+    const sc = score[p];
+    if (!sc || !shown(PARTS[p].session)) continue;
+    steps.push([
+      p === "quali"
+        ? `Qualifications${grid ? " (grille officielle)" : " (provisoire)"}`
+        : LABELS[p],
+      sc.total,
+    ]);
+  }
+  if (shown("Race")) {
+    if (score.fastest !== null) steps.push(["Meilleur tour", score.fastest]);
+    if (score.dnf !== null) steps.push(["Abandons", score.dnf]);
+    if (score.answer !== null) steps.push(["Question du week-end", score.answer]);
+  }
+  if (!steps.length) return null;
+  let total = 0;
+  const base = steps.reduce((a, [, p]) => a + p, 0);
+  return (
+    <View style={s.card}>
+      <Text style={s.label}>MES POINTS, ÉTAPE PAR ÉTAPE</Text>
+      {steps.map(([label, p]) => {
+        total += p;
+        return (
+          <View key={label} style={s.rank}>
+            <Text style={[s.text, { flex: 1 }]}>{label}</Text>
+            <Text style={[s.time, { width: 50, textAlign: "right" }, p > 0 && { color: c.accent }]}>
+              +{p}
+            </Text>
+            <Text style={[s.cardTitle, { width: 70, textAlign: "right" }]}>{total}</Text>
+          </View>
+        );
+      })}
+      {score.joker && (
+        <View style={s.rank}>
+          <Text style={[s.text, { flex: 1 }]}>🃏 Joker ×2</Text>
+          <Text style={[s.time, { width: 50, textAlign: "right", color: c.accent }]}>+{base}</Text>
+          <Text style={[s.cardTitle, { width: 70, textAlign: "right" }]}>{base * 2}</Text>
+        </View>
+      )}
+      <Text style={s.small}>
+        Par case : ✓ place exacte +{POINTS.exact} · ±1 à une place près +{POINTS.close} · top dans
+        le top mais mal placé +{POINTS.inTop}.
+      </Text>
     </View>
   );
 }
