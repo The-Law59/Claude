@@ -108,3 +108,8 @@ export function notifyFriend(state, from, to, opts) {
     opts,
   );
 }
+
+// Mercato : transfert officialisé ou rumeur tranchée, avec ses points.
+export function notifyMercato(state, userId, { key, text }, opts) {
+  notify(state, userId, { key: `mercato:${key}`, text: () => text, link: "/mercato" }, opts);
+}

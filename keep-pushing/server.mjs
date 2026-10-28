@@ -7,7 +7,7 @@ import { createServer } from "node:http";
 import { copyFile, readFile, readdir, rm, writeFile, mkdir } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
-import { fetchFeeds } from "./src/news.mjs";
+import { fetchFeeds, toArticle } from "./src/news.mjs";
 import { loadRound, loadSeason } from "./src/jolpica.mjs";
 import { createTranslator } from "./src/translate.mjs";
 import * as accounts from "./src/accounts.mjs";
@@ -21,6 +21,7 @@ import * as admin from "./src/admin.mjs";
 import * as monitor from "./src/monitor.mjs";
 import { createPracticeSource, isPractice } from "./src/practice.mjs";
 import * as ads from "./src/ads.mjs";
+import * as mercato from "./src/mercato.mjs";
 import { exactCount, highlights } from "./src/recap.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
@@ -29,6 +30,8 @@ const PORT = Number(process.env.PORT) || 3000;
 const STARTED = Date.now();
 // Pseudos admins (avis, modération du forum) : ADMINS=Quentin,Lucas dans .env.
 const ADMINS = community.parseAdmins(process.env.ADMINS);
+// Jeu Mercato : grille de cette saison-là (jouée pendant la saison précédente).
+const MERCATO_YEAR = Number(process.env.MERCATO_YEAR) || 2028;
 // Version de l'app : package.app.json dans l'image Docker, sinon package.json.
 const readVersion = (file) =>
   readFile(join(import.meta.dirname, file), "utf8").then((t) => JSON.parse(t).version);
@@ -440,6 +443,150 @@ async function readJson(req) {
   }
 }
 
+// --- Jeu Mercato.
+async function mercatoApi(req, path, auth, adminOnly) {
+  if (!season) return [503, { error: "Saison indisponible." }];
+  const game = mercato.gameOf(state, MERCATO_YEAR);
+  const pool = mercato.poolOf(game, season.drivers);
+  const ids = { driverIds: pool.map((d) => d.id), teamIds: season.teams.map((t) => t.id) };
+  const name = (id) => pool.find((d) => d.id === id)?.name ?? id;
+  const teamName = (id) => season.teams.find((t) => t.id === id)?.name ?? id;
+  // Prévient les joueurs concernés par une officialisation et les rumeurs tranchées.
+  const announce = (official, resolved) => {
+    const score = official && mercato.scoreOfficial(game, official);
+    if (official)
+      for (const uid of mercato.players(game)) {
+        const pts = score.winners[uid];
+        notify.notifyMercato(state, uid, {
+          key: official.driverId,
+          text: `Officiel : ${name(official.driverId)} chez ${teamName(official.teamId)} en ${MERCATO_YEAR}${pts ? ` · +${pts} pts 🎯` : ""}`,
+        });
+      }
+    for (const r of resolved)
+      for (const [uid, pts] of Object.entries(mercato.scoreRumor(r)))
+        notify.notifyMercato(state, uid, {
+          key: `rumor:${r.id}`,
+          text: `Rumeur ${r.status === "confirmed" ? "confirmée" : "démentie"} : ${name(r.driverId)} → ${teamName(r.teamId)} · +${pts} pts`,
+        });
+  };
+  const view = (user) => {
+    const t = mercato.totals(game);
+    return {
+      year: MERCATO_YEAR,
+      teams: season.teams.map((team) => ({
+        id: team.id,
+        name: team.name,
+        today: season.drivers.filter((d) => d.teamId === team.id).map((d) => d.id),
+      })),
+      drivers: pool,
+      mine: Object.fromEntries(
+        Object.entries(game.picks[user.id] ?? {}).map(([teamId, l]) => [
+          teamId,
+          l.map((p) => p.driverId),
+        ]),
+      ),
+      official: game.official.map((o) => {
+        const sc = mercato.scoreOfficial(game, o);
+        return { ...o, share: sc.share, points: sc.winners[user.id] ?? 0 };
+      }),
+      rumors: Object.values(game.rumors)
+        .sort((a, b) => b.at - a.at)
+        .map((r) => mercato.rumorView(r, user.id)),
+      score: t[user.id] ?? { seats: 0, rumors: 0, total: 0, exact: 0 },
+      admin: community.isAdmin(user, ADMINS),
+    };
+  };
+  if (path === "/api/mercato") return [200, view(auth())];
+  if (path === "/api/mercato/picks" && req.method === "PUT") {
+    const user = auth();
+    mercato.setPicks(game, user.id, await readJson(req), ids);
+    await save();
+    return [200, view(user)];
+  }
+  const voteRoute = path.match(/^\/api\/mercato\/rumors\/([\w-]+)\/vote$/);
+  if (voteRoute && req.method === "POST") {
+    const user = auth();
+    mercato.vote(game, user.id, voteRoute[1], (await readJson(req))?.credible);
+    await save();
+    return [200, view(user)];
+  }
+  if (path === "/api/mercato/leaderboard") {
+    const user = auth();
+    const t = mercato.totals(game);
+    const rank = (list) =>
+      list
+        .filter((id) => state.users[id])
+        .map((id) => ({ id, ...(t[id] ?? { seats: 0, rumors: 0, total: 0, exact: 0 }) }))
+        .sort(
+          (a, b) =>
+            b.total - a.total || state.users[a.id].pseudo.localeCompare(state.users[b.id].pseudo),
+        )
+        .map((row, i) => ({
+          rank: i + 1,
+          pseudo: state.users[row.id].pseudo,
+          points: row.total,
+          exact: row.exact,
+          rumors: row.rumors,
+          me: row.id === user.id,
+        }));
+    const general = rank(mercato.players(game));
+    return [
+      200,
+      {
+        general: general.filter((r, i) => i < 100 || r.me),
+        players: general.length,
+        friends: rank([...new Set([user.id, ...accounts.friendIds(state, user)])]),
+      },
+    ];
+  }
+  // --- Admins.
+  if (path === "/api/mercato/suggestions") {
+    adminOnly();
+    const articles = (news ?? []).map((item) => toArticle(item, season));
+    return [200, mercato.suggestions(articles, game)];
+  }
+  if (path === "/api/mercato/rumors" && req.method === "POST") {
+    const user = adminOnly();
+    mercato.addRumor(game, user, await readJson(req), ids);
+    await save();
+    return [201, view(user)];
+  }
+  const rumor = path.match(/^\/api\/mercato\/rumors\/([\w-]+)(\/resolve)?$/);
+  if (rumor) {
+    const user = adminOnly();
+    if (req.method === "DELETE" && !rumor[2]) {
+      if (!game.rumors[rumor[1]]) return [404, { error: "Rumeur introuvable." }];
+      delete game.rumors[rumor[1]];
+    } else if (req.method === "POST" && rumor[2]) {
+      const r = mercato.resolveRumor(game, rumor[1], (await readJson(req))?.status);
+      if (r.status !== "open") announce(null, [r]);
+    } else return [405, { error: "Méthode non permise." }];
+    await save();
+    return [200, view(user)];
+  }
+  if (path === "/api/mercato/official" && req.method === "POST") {
+    const user = adminOnly();
+    const { official, resolved } = mercato.makeOfficial(game, await readJson(req), ids);
+    announce(official, resolved);
+    await save();
+    return [201, view(user)];
+  }
+  const cancel = path.match(/^\/api\/mercato\/official\/([\w-]+)$/);
+  if (cancel && req.method === "DELETE") {
+    const user = adminOnly();
+    mercato.cancelOfficial(game, cancel[1]);
+    await save();
+    return [200, view(user)];
+  }
+  if (path === "/api/mercato/drivers" && req.method === "POST") {
+    const user = adminOnly();
+    mercato.addDriver(game, (await readJson(req))?.name, pool);
+    await save();
+    return [201, view(user)];
+  }
+  return [404, { error: "Route inconnue." }];
+}
+
 async function api(req, path) {
   if (path === "/api/news.json") {
     if (!news) await firstNews;
@@ -482,6 +629,7 @@ async function api(req, path) {
       });
     return [200, { available: true, rows: practiceCache.get(key).rows }];
   }
+  if (path.startsWith("/api/mercato")) return mercatoApi(req, path, auth, adminOnly);
   // --- Pubs récompensées (désactivées tant que ADS_ENABLED n'est pas à 1).
   if (path.startsWith("/api/ads/")) {
     if (process.env.ADS_ENABLED !== "1") return [404, { error: "Pubs désactivées." }];

@@ -128,6 +128,11 @@ export default function Pronos() {
         value={tab}
         onChange={setTab}
       />
+      <Button
+        label="🔁 Jeu Mercato : devinez la grille de la saison prochaine →"
+        secondary
+        onPress={() => router.push("/mercato")}
+      />
       {tab === "bet" && <Weekend />}
       {tab === "rank" && <Rankings key={league} initial={league} />}
       {tab === "season" && <SeasonTab />}

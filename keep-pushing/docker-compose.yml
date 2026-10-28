@@ -10,6 +10,8 @@ services:
       # Résultats des essais libres (fournisseur sous licence, voir deploy/README.md).
       PRACTICE_PROVIDER: ${PRACTICE_PROVIDER:-}
       PRACTICE_API_KEY: ${PRACTICE_API_KEY:-}
+      # Jeu Mercato : année de la grille à deviner (2028 par défaut).
+      MERCATO_YEAR: ${MERCATO_YEAR:-}
       # Joker regagné avec les pubs (1 pour activer, une fois l'appli sur les stores).
       ADS_ENABLED: ${ADS_ENABLED:-}
     volumes:

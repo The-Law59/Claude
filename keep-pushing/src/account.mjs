@@ -4,6 +4,7 @@
 import { randomBytes } from "node:crypto";
 import { PSEUDO_RULE, checkPassword, hashPassword, sessionHash } from "./accounts.mjs";
 import { fail } from "./errors.mjs";
+import { forget as forgetMercato } from "./mercato.mjs";
 
 const bearer = (header) => (header ?? "").replace(/^Bearer /, "");
 async function confirm(user, password) {
@@ -56,6 +57,17 @@ export function exportData(state, user) {
         .filter(([, byUser]) => byUser[user.id])
         .map(([s, byUser]) => [s, byUser[user.id]]),
     ),
+    mercato: Object.fromEntries(
+      Object.entries(state.mercato ?? {}).map(([year, game]) => [
+        year,
+        {
+          grid: game.picks[user.id] ?? null,
+          votes: Object.values(game.rumors)
+            .filter((r) => r.votes[user.id])
+            .map((r) => ({ rumor: r.text, credible: r.votes[user.id].credible })),
+        },
+      ]),
+    ),
     leagues: Object.values(state.leagues ?? {})
       .filter((l) => l.members.includes(user.id))
       .map((l) => ({ name: l.name, owner: l.owner === user.id, messages: mine(l.messages ?? []) })),
@@ -100,5 +112,6 @@ export async function deleteAccount(state, user, body) {
   }
   delete state.notifications?.[id];
   delete state.adRewards?.[id];
+  forgetMercato(state, id);
   for (const f of state.feedback ?? []) if (f.userId === id) f.userId = null;
 }

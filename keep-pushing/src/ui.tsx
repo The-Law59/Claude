@@ -257,6 +257,10 @@ function Menu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
           ],
     ],
     [
+      "Jeux",
+      [["🔁", "Mercato : la grille de la saison prochaine", "/mercato", unread("mercato:")]],
+    ],
+    [
       "Outils F1",
       [
         ["⚔", "Duel de pilotes", "/duel"],

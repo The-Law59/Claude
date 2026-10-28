@@ -48,9 +48,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/app/(tabs)/pronos.tsx": {
-    "mtime": 1793196474.9705124,
-    "seen": 1793196530.3498201,
-    "ast_hash": "892547eed716450f49bf41169ef553f9",
+    "mtime": 1793197679.3984673,
+    "seen": 1793197958.0333755,
+    "ast_hash": "6e350b9f87ebe585833f1a4d1f68ccdd",
     "semantic_hash": ""
   },
   "keep-pushing/app/(tabs)/season.tsx": {
@@ -186,9 +186,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/server.mjs": {
-    "mtime": 1793110839.0457969,
-    "seen": 1793111153.9279861,
-    "ast_hash": "da452ce78ccf86f869ca5ebd5ba4f19f",
+    "mtime": 1793197565.0591972,
+    "seen": 1793197958.0334194,
+    "ast_hash": "dda184e9c96e591c2d5fae1e9af446ad",
     "semantic_hash": ""
   },
   "keep-pushing/src/RecapCard.tsx": {
@@ -198,9 +198,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/account.mjs": {
-    "mtime": 1793110941.9656365,
-    "seen": 1793111153.9279883,
-    "ast_hash": "ca63d0c05bdeeeef9924b86de914ab3e",
+    "mtime": 1793197586.0492969,
+    "seen": 1793197958.0334227,
+    "ast_hash": "2f6bd0e8bdadfbb1d102dbd17ea609cb",
     "semantic_hash": ""
   },
   "keep-pushing/src/accounts.mjs": {
@@ -300,9 +300,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/notify.mjs": {
-    "mtime": 1793110708.091211,
-    "seen": 1793111153.9280105,
-    "ast_hash": "806a9b6141f5b1e1cc0074a37f8a5ec1",
+    "mtime": 1793197557.7831967,
+    "seen": 1793197958.033449,
+    "ast_hash": "7f71b30ecb58f0fd56b6157e2dcfe349",
     "semantic_hash": ""
   },
   "keep-pushing/src/practice.mjs": {
@@ -354,9 +354,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/ui.tsx": {
-    "mtime": 1793196466.3648832,
-    "seen": 1793196530.3498998,
-    "ast_hash": "83810a3dbb73ac4d2b5f61a44f8ef03e",
+    "mtime": 1793197680.287204,
+    "seen": 1793197958.033463,
+    "ast_hash": "4ae31329b4179b1bf24a421affc7ba64",
     "semantic_hash": ""
   },
   "keep-pushing/src/weather.mjs": {
@@ -468,9 +468,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/README.md": {
-    "mtime": 1793196526.371753,
-    "seen": 1793196530.3499281,
-    "ast_hash": "ac06b53572c3e4c8e3ccc20b6628ea56",
+    "mtime": 1793197955.2005858,
+    "seen": 1793197958.0334957,
+    "ast_hash": "f8d7d9c55b29d9d7a74e518a8d539efd",
     "semantic_hash": ""
   },
   "keep-pushing/VALIDATION.md": {
@@ -486,15 +486,33 @@
     "semantic_hash": ""
   },
   "keep-pushing/docker-compose.yml": {
-    "mtime": 1793110980.3641572,
-    "seen": 1793111153.928044,
-    "ast_hash": "94bc6e63b2360ff09e75b5cbcea25355",
+    "mtime": 1793197955.2016451,
+    "seen": 1793197958.0335,
+    "ast_hash": "c45b386a8df5cbfaaacfc78f9f62e25d",
     "semantic_hash": ""
   },
   "keep-pushing/docs/pubs-joker.md": {
     "mtime": 1793110980.3701315,
     "seen": 1793111153.9280453,
     "ast_hash": "1c5b2ebe1c33f9980a0978589ea56402",
+    "semantic_hash": ""
+  },
+  "keep-pushing/app/mercato.tsx": {
+    "mtime": 1793197680.111204,
+    "seen": 1793197958.0334036,
+    "ast_hash": "dab25daece59b23868875192ed803767",
+    "semantic_hash": ""
+  },
+  "keep-pushing/src/mercato.mjs": {
+    "mtime": 1793197941.8098817,
+    "seen": 1793197958.0334432,
+    "ast_hash": "f142d903fffcc48872295a7b04f44dd8",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/mercato.test.mjs": {
+    "mtime": 1793197528.791195,
+    "seen": 1793197958.0334759,
+    "ast_hash": "c01a78594953b178c7c61746085544d7",
     "semantic_hash": ""
   }
 }
