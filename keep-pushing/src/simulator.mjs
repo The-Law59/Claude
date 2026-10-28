@@ -22,6 +22,14 @@ export function contenders(drivers, sessions) {
   return drivers.filter((d) => d.points + left >= leader).sort((a, b) => b.points - a.points);
 }
 
+// Pilotes simulés : les prétendants au titre, plus mon pilote favori s'il
+// n'en fait pas partie (pour voir jusqu'où il peut remonter).
+export function simulated(drivers, sessions, favoriteId) {
+  const list = contenders(drivers, sessions);
+  const fav = drivers.find((d) => d.id === favoriteId);
+  return fav && !list.includes(fav) ? [...list, fav] : list;
+}
+
 // picks : { sessionId: { driverId: place } } (place absente = hors points).
 export function simulate(drivers, sessions, picks) {
   return drivers

@@ -9,6 +9,7 @@ import {
   remaining,
   setPlace,
   simulate,
+  simulated,
 } from "../src/simulator.mjs";
 import { useStore } from "../src/store";
 import { Button, Screen, useTheme } from "../src/ui";
@@ -25,7 +26,14 @@ export default function Simulator() {
   const { prefs, season } = useStore();
   const router = useRouter();
   const rem: Race[] = useMemo(() => remaining(season.events), [season.events]);
-  const rivals: Driver[] = useMemo(() => contenders(season.drivers, rem), [season.drivers, rem]);
+  // Prétendants au titre, plus mon pilote favori pour voir où il peut finir.
+  const title: Driver[] = useMemo(() => contenders(season.drivers, rem), [season.drivers, rem]);
+  const rivals: Driver[] = useMemo(
+    () => simulated(season.drivers, rem, prefs.myDriver),
+    [season.drivers, rem, prefs.myDriver],
+  );
+  const isFav = (id: string) => id === prefs.myDriver;
+  const star = (d: Driver) => (isFav(d.id) ? " ★" : "");
   const [picks, setPicks] = useState<Picks>(() =>
     defaultPicks(
       rem,
@@ -63,10 +71,10 @@ export default function Simulator() {
         {rem.filter((x) => x.type === "Sprint").length} sprints restants · {maxLeft(rem)} points en
         jeu au maximum par pilote.
       </Text>
-      {rivals.length < 2 ? (
+      {title.length < 2 ? (
         <View style={s.card}>
           <Text style={s.cardTitle}>
-            🏆 {rivals[0]?.name ?? "—"} est déjà champion : plus personne ne peut le rattraper.
+            🏆 {title[0]?.name ?? "—"} est déjà champion : plus personne ne peut le rattraper.
           </Text>
         </View>
       ) : (
@@ -80,22 +88,33 @@ export default function Simulator() {
             {final.map((d, i) => (
               <View key={d.id} style={s.rank}>
                 <Text style={s.position}>{i + 1}</Text>
-                <Text style={[s.text, { flex: 1, color: team(d.teamId) }]}>{d.name}</Text>
+                <Text style={[s.text, { flex: 1, color: team(d.teamId) }]}>
+                  {d.name}
+                  {star(d)}
+                </Text>
                 <Text style={s.small}>+{d.gained}</Text>
                 <Text style={[s.time, { width: 70, textAlign: "right" }]}>{d.total} pts</Text>
               </View>
             ))}
             <Text style={s.small}>
-              Seuls les pilotes encore mathématiquement en lice sont simulés. Places par défaut :
+              Pilotes encore mathématiquement en lice
+              {rivals.length > title.length ? ", plus votre pilote ★" : ""}. Places par défaut :
               l’ordre actuel du championnat.
             </Text>
+            {!prefs.myDriver && (
+              <Button
+                label="★ Choisir mon pilote pour l’ajouter"
+                secondary
+                onPress={() => router.navigate("/favorites")}
+              />
+            )}
           </View>
           <Text style={s.heading}>Raccourcis</Text>
           <View style={s.pills}>
             {rivals.map((d) => (
               <Button
                 key={d.id}
-                label={`${last(d.name)} gagne tout`}
+                label={`${last(d.name)}${star(d)} gagne tout`}
                 secondary
                 onPress={() => winsAll(d.id)}
               />
@@ -127,7 +146,10 @@ export default function Simulator() {
                   );
                 return (
                   <View key={d.id} style={[s.rank, { gap: 8 }]}>
-                    <Text style={[s.text, { flex: 1, color: team(d.teamId) }]}>{last(d.name)}</Text>
+                    <Text style={[s.text, { flex: 1, color: team(d.teamId) }]}>
+                      {last(d.name)}
+                      {star(d)}
+                    </Text>
                     <Button label="−" secondary onPress={() => move(-1)} />
                     <Text style={[s.cardTitle, { width: 52, textAlign: "center" }]}>
                       {place >= OUT ? "—" : `P${place}`}

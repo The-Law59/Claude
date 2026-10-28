@@ -37,7 +37,7 @@ Les rappels locaux sont réservés au téléphone.
 - Rappel local 1 h avant la fermeture des paris (qualifs, sprint, course), réglable dans Réglages (téléphone uniquement).
 - Réglages synchronisés avec le compte (`/api/settings`) : favoris, mon pilote/écurie, anti-spoil, filtres d’actus et thème suivent le joueur sur tous ses téléphones ; les rappels restent propres à chaque appareil.
 - Pages pilote et écurie (depuis Saison → classements) : place, points, victoires, podiums, forme sur 5 GP, saison GP par GP, actus liées.
-- Simulateur de championnat (Saison → Pilotes) : courses et sprints restants, pilotes encore en lice, places à choisir, classement final recalculé.
+- Simulateur de championnat (Saison → Pilotes) : courses et sprints restants, pilotes encore en lice (plus mon pilote ★ s’il n’en fait plus partie), places à choisir, classement final recalculé.
 - Essais libres : Jolpica ne les publie pas ; connecteur de fournisseur prêt (`src/practice.mjs`, `PRACTICE_PROVIDER` / `PRACTICE_API_KEY`, Hyprace en premier choix), message « pas encore disponibles » en attendant.
 - Page GP : météo par session (Open-Meteo, jusqu’à 16 jours avant), heure locale du circuit, derniers vainqueurs du circuit.
 - Mode sombre (Réglages → Affichage : comme le téléphone, clair ou sombre) ; couleurs d’écurie éclaircies automatiquement pour rester lisibles (contraste ≥ 4,5:1 testé).
