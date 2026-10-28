@@ -232,3 +232,67 @@ export const askFeedback = (prefs, now = Date.now()) =>
   !!prefs.firstSeen &&
   now - prefs.firstSeen > 3 * 86400000 &&
   (!prefs.feedbackAt || now - prefs.feedbackAt > 30 * 86400000);
+
+// Carte « À faire » de l'accueil : l'action la plus utile du moment.
+// bets : vue /api/bets du prochain GP (ou null) ; notices : notifications non lues.
+// Ordre : pronos qui ferment sous 48 h, demande d'ami, pronos à faire,
+// autres notifications, puis l'état des pronos (prêts, prochaine ouverture).
+export const BET_TODO = {
+  quali: "top 10 des qualifs",
+  sprint: "top 8 du sprint",
+  race: "top 10 de la course",
+  fastest: "meilleur tour",
+  dnf: "abandons",
+  answer: "question du week-end",
+};
+/** @param {{ bets: any, notices?: { key: string, text: string, link: string }[], eventId: string, now?: number }} o */
+export function nextAction({ bets, notices = [], eventId, now = Date.now() }) {
+  const keys = bets ? [...bets.parts, "fastest", "dnf", "answer"] : [];
+  const open = keys.filter((k) => now >= bets.opens[k] && now < bets.closes[k]);
+  const missing = open.filter((k) => bets.mine?.[k] === undefined);
+  const close = (list) => Math.min(...list.map((k) => bets.closes[k]));
+  const toBet = missing.length && {
+    kind: "bets",
+    icon: "🎯",
+    title: `À parier : ${missing.map((k) => BET_TODO[k]).join(", ")}`,
+    at: close(missing),
+    href: `/bet-wizard?event=${eventId}`,
+    label: "Faire mes pronos pas à pas",
+  };
+  const friend = notices.find((n) => n.key.startsWith("friend:"));
+  if (toBet && toBet.at - now < 48 * 3600000) return { ...toBet, urgent: true };
+  if (friend)
+    return { kind: "friend", icon: "👥", title: friend.text, href: "/friends", label: "Répondre" };
+  if (toBet) return toBet;
+  if (notices.length)
+    return {
+      kind: "notices",
+      icon: "🔔",
+      title: notices.length === 1 ? notices[0].text : `${notices.length} nouvelles notifications`,
+      href: notices.length === 1 ? notices[0].link : "/notifications",
+      label: "Voir",
+    };
+  if (open.length)
+    return {
+      kind: "ready",
+      icon: "✓",
+      title: "Tous vos pronos sont prêts",
+      at: close(open),
+      href: "/pronos",
+      label: "Revoir mes pronos",
+    };
+  const soon = keys
+    .filter((k) => now < bets.opens[k])
+    .sort((a, b) => bets.opens[a] - bets.opens[b]);
+  if (soon.length)
+    return {
+      kind: "soon",
+      icon: "⏳",
+      title: `Prochains pronos : ${soon
+        .filter((k) => bets.opens[k] === bets.opens[soon[0]])
+        .map((k) => BET_TODO[k])
+        .join(", ")}`,
+      opensAt: bets.opens[soon[0]],
+    };
+  return null;
+}

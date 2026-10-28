@@ -3,7 +3,13 @@ import { Pressable, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { api, hasApi } from "../../src/api.mjs";
 import { RecapCard } from "../../src/RecapCard";
-import { articleVisible, askFeedback, protectWeekend, teammateOf } from "../../src/model.mjs";
+import {
+  articleVisible,
+  askFeedback,
+  nextAction,
+  protectWeekend,
+  teammateOf,
+} from "../../src/model.mjs";
 import { useStore } from "../../src/store";
 import { Button, Pills, Screen, SourceBadge, formatDate, ordinal, useTheme } from "../../src/ui";
 
@@ -33,6 +39,7 @@ export default function Home() {
     <Screen>
       <Text style={s.title}>Au cœur du paddock.</Text>
       <Text style={s.subtitle}>Votre sélection, votre rythme.</Text>
+      {season.mode === "live" && hasApi() && !!prefs.account && <TodoCard eventId={current.id} />}
       <View style={s.hero}>
         <Text style={s.heroLabel}>
           {season.mode === "live" ? "PROCHAIN GRAND PRIX" : "WEEK-END DE DÉMONSTRATION"}
@@ -82,7 +89,6 @@ export default function Home() {
             onClose={() => setPrefs((p) => ({ ...p, recapClosed: last.id }))}
           />
         )}
-      {season.mode === "live" && hasApi() && !!prefs.account && <MyBets eventId={current.id} />}
       {hasApi() && !!prefs.account && askFeedback(prefs) && (
         <View style={s.card}>
           <Text style={s.label}>VOTRE AVIS COMPTE</Text>
@@ -210,78 +216,65 @@ export default function Home() {
   );
 }
 
-// Ce qu'il manque à mes paris du prochain GP, avec la prochaine fermeture.
-const TODO: Record<string, string> = {
-  quali: "top 10 des qualifs",
-  sprint: "top 8 du sprint",
-  race: "top 10 de la course",
-  fastest: "meilleur tour",
-  dnf: "abandons",
-  answer: "question du week-end",
+// Carte « À faire » : la seule action utile du moment (pronos, ami, notifications).
+type BetsView = {
+  closes: Record<string, number>;
+  opens: Record<string, number>;
+  parts: string[];
+  mine: Record<string, unknown> | null;
 };
-function MyBets({ eventId }: { eventId: string }) {
+type Action = {
+  kind: string;
+  icon: string;
+  title: string;
+  href?: string;
+  label?: string;
+  at?: number;
+  opensAt?: number;
+  urgent?: boolean;
+};
+function TodoCard({ eventId }: { eventId: string }) {
   const { s, c } = useTheme();
-  const { prefs } = useStore();
+  const { prefs, inbox } = useStore();
   const router = useRouter();
-  const [view, setView] = useState<{
-    closes: Record<string, number>;
-    opens: Record<string, number>;
-    parts: string[];
-    mine: Record<string, unknown> | null;
-  } | null>(null);
+  const [bets, setBets] = useState<BetsView | null>(null);
   useFocusEffect(
     useCallback(() => {
       api(`/api/bets/${eventId}`, { token: prefs.account?.token })
-        .then(setView)
-        .catch(() => setView(null));
+        .then(setBets)
+        .catch(() => setBets(null));
     }, [eventId, prefs.account?.token]),
   );
-  if (!view) return null;
-  const now = Date.now();
-  const keys = [...view.parts, "fastest", "dnf", "answer"];
-  const open = keys.filter((k) => now >= view.opens[k] && now < view.closes[k]);
-  const soon = keys
-    .filter((k) => now < view.opens[k])
-    .sort((a, b) => view.opens[a] - view.opens[b]);
-  if (!open.length && !soon.length) return null;
-  if (!open.length)
-    return (
-      <View style={s.card}>
-        <Text style={s.label}>MES PRONOS</Text>
-        <Text style={s.text}>
-          Prochaine ouverture le {formatDate(view.opens[soon[0]])} :{" "}
-          {soon
-            .filter((k) => view.opens[k] === view.opens[soon[0]])
-            .map((k) => TODO[k])
-            .join(", ")}
-          .
-        </Text>
-      </View>
-    );
-  const missing = open.filter((k) => view.mine?.[k] === undefined);
-  const nextClose = Math.min(...(missing.length ? missing : open).map((k) => view.closes[k]));
-  const hours = Math.max(0, Math.round((nextClose - now) / 3600000));
-  const when = hours < 48 ? `dans ${hours} h` : `le ${formatDate(nextClose)}`;
+  const a = nextAction({
+    bets,
+    notices: inbox.items.filter((n) => !n.read),
+    eventId,
+  }) as Action | null;
+  if (!a) return null;
+  const when = (t: number) => {
+    const hours = Math.max(0, Math.round((t - Date.now()) / 3600000));
+    return hours < 48 ? `dans ${hours} h` : `le ${formatDate(t)}`;
+  };
+  const strong = a.kind !== "ready" && a.kind !== "soon";
   return (
-    <View style={[s.card, missing.length > 0 && { borderWidth: 2, borderColor: c.accent }]}>
-      <Text style={s.label}>MES PRONOS</Text>
-      {missing.length ? (
-        <>
-          <Text style={s.cardTitle}>
-            Il vous manque : {missing.map((k) => TODO[k]).join(", ")}.
-          </Text>
-          <Text style={s.small}>Prochaine fermeture {when}.</Text>
-          <Button
-            label="🧭 Compléter mes pronos pas à pas →"
-            onPress={() => router.push(`/bet-wizard?event=${eventId}`)}
-          />
-        </>
-      ) : (
-        <>
-          <Text style={s.cardTitle}>✓ Tous vos paris sont prêts.</Text>
-          <Text style={s.small}>Modifiables jusqu’à la fermeture, {when}.</Text>
-          <Button label="Revoir mes pronos" secondary onPress={() => router.navigate("/pronos")} />
-        </>
+    <View style={[s.card, strong && { borderWidth: 2, borderColor: c.accent }]}>
+      <Text style={s.label}>À FAIRE</Text>
+      <Text style={s.cardTitle}>
+        {a.icon} {a.title}
+      </Text>
+      {!!a.at && (
+        <Text style={[s.small, a.urgent && { color: c.accent, fontWeight: "700" }]}>
+          {a.kind === "ready" ? "Modifiables jusqu’à la fermeture, " : "Fermeture "}
+          {when(a.at)}.
+        </Text>
+      )}
+      {!!a.opensAt && <Text style={s.small}>Ouverture le {formatDate(a.opensAt)}.</Text>}
+      {!!a.href && (
+        <Button
+          label={`${a.label} →`}
+          secondary={!strong}
+          onPress={() => router.push(a.href as never)}
+        />
       )}
     </View>
   );

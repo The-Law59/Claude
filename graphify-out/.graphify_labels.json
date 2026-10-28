@@ -5,7 +5,7 @@
   "3": "game.test.mjs",
   "4": "server.mjs",
   "5": "package.json",
-  "6": "ref_node_test",
+  "6": "ads.mjs",
   "7": "jolpica.mjs",
   "8": "simulator.tsx",
   "9": "Installer Keep Pushing sur Proxmox",
@@ -17,5 +17,6 @@
   "15": ".claude/CLAUDE.md",
   "16": "session-start.sh",
   "17": "install-lxc.sh",
-  "18": "VALIDATION.md"
+  "18": "VALIDATION.md",
+  "19": "app/_layout.tsx"
 }

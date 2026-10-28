@@ -7,7 +7,7 @@ import { Button, Screen, useCall, useTheme } from "../src/ui";
 type Person = { id: string; pseudo: string };
 type Friends = { me: Person; friends: Person[]; incoming: Person[]; outgoing: Person[] };
 
-// Amis : ouverts depuis le bouton 👥 de l'en-tête (demandes reçues en pastille).
+// Amis : ouverts depuis le menu ☰ (demandes reçues en pastille).
 export default function FriendsScreen() {
   const { s } = useTheme();
   const { prefs, markRead } = useStore();

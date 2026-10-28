@@ -689,7 +689,7 @@ function Rankings({ initial }: { initial?: string }) {
             ))}
             {scope === "friends" && (rows?.length ?? 0) <= 1 && (
               <Text style={s.small}>
-                Ajoutez des amis avec le bouton 👥 en haut de l’écran pour vous comparer.
+                Ajoutez des amis depuis le menu ☰ (Amis) pour vous comparer.
               </Text>
             )}
           </View>

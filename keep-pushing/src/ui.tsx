@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -153,35 +154,41 @@ export function Pills<T extends string | number | boolean>({
   );
 }
 
-// En-tête commun : marque, bouclier anti-spoil, origine des données.
+// En-tête commun : menu ☰, marque, notifications, origine des données.
 export function Screen({ children }: { children: React.ReactNode }) {
   const { c, s, dark } = useTheme();
   const { prefs, season, error, inbox } = useStore();
   const router = useRouter();
-  const friendRequests = inbox.items.filter((n) => !n.read && n.key.startsWith("friend:")).length;
+  const [menu, setMenu] = useState(false);
   const protectedAny = prefs.protectedSessions.length > 0;
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <StatusBar style={dark ? "light" : "dark"} />
       <View style={s.header}>
-        <View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Ouvrir le menu"
+          onPress={() => setMenu(true)}
+          style={[s.iconButton, { marginRight: 12 }]}
+        >
+          <Text style={{ color: c.ink, fontSize: 22 }}>☰</Text>
+        </Pressable>
+        <View style={{ flex: 1 }}>
           <Text style={s.brand}>
             Keep <Text style={{ color: c.accent }}>Pushing.</Text>
           </Text>
           <Text style={s.small}>La F1 à votre rythme.</Text>
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
-          {!!prefs.account && (
+          {/* Anti-spoil : visible seulement quand il protège quelque chose. */}
+          {protectedAny && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Amis : ${friendRequests} nouveauté(s)`}
-              onPress={() => router.push("/friends")}
-              style={[s.shield, { minWidth: 52 }]}
+              accessibilityLabel="Anti-spoil actif : gérer la protection"
+              onPress={() => router.navigate("/settings")}
+              style={[s.iconButton, { backgroundColor: c.lockOn }]}
             >
-              <Text style={{ color: c.ink }}>👥</Text>
-              <Text style={[s.tiny, friendRequests > 0 && { color: c.accent, fontWeight: "700" }]}>
-                {friendRequests > 0 ? `${friendRequests} nouv.` : "Amis"}
-              </Text>
+              <Text style={{ color: c.green, fontSize: 18 }}>◈</Text>
             </Pressable>
           )}
           {!!prefs.account && (
@@ -189,25 +196,17 @@ export function Screen({ children }: { children: React.ReactNode }) {
               accessibilityRole="button"
               accessibilityLabel={`Notifications : ${inbox.unread} non lue(s)`}
               onPress={() => router.push("/notifications")}
-              style={[s.shield, { minWidth: 52 }]}
+              style={s.iconButton}
             >
-              <Text style={{ color: c.ink }}>🔔</Text>
-              <Text style={[s.tiny, inbox.unread > 0 && { color: c.accent, fontWeight: "700" }]}>
-                {inbox.unread > 0 ? `${inbox.unread} nouv.` : "Notifs"}
-              </Text>
+              <Text style={{ fontSize: 20 }}>🔔</Text>
+              {inbox.unread > 0 && (
+                <Text style={s.dot}>{inbox.unread > 9 ? "9+" : inbox.unread}</Text>
+              )}
             </Pressable>
           )}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Gérer l’anti-spoil"
-            onPress={() => router.navigate("/settings")}
-            style={[s.shield, protectedAny && { backgroundColor: c.lockOn }]}
-          >
-            <Text style={{ color: protectedAny ? c.green : c.ink }}>◈</Text>
-            <Text style={s.tiny}>{protectedAny ? "Protégé" : "Anti-spoil"}</Text>
-          </Pressable>
         </View>
       </View>
+      <Menu visible={menu} onClose={() => setMenu(false)} />
       <View style={s.demo}>
         <Text style={s.tiny}>
           {season.mode === "live"
@@ -222,6 +221,127 @@ export function Screen({ children }: { children: React.ReactNode }) {
       )}
       <ScrollView contentContainerStyle={s.content}>{children}</ScrollView>
     </SafeAreaView>
+  );
+}
+
+// Menu ☰ : tout ce qui n'est pas dans les onglets du bas.
+function Menu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { c, s } = useTheme();
+  const { prefs, inbox } = useStore();
+  const router = useRouter();
+  const call = useCall();
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => {
+    if (!visible || !prefs.account || !hasApi()) return;
+    call("/api/me")
+      .then((me) => setAdmin(!!me.admin))
+      .catch(() => setAdmin(false));
+  }, [visible, call, prefs.account]);
+  const unread = (prefix: string) =>
+    inbox.items.filter((n) => !n.read && n.key.startsWith(prefix)).length;
+  const protectedCount = prefs.protectedSessions.length;
+  type Item = [icon: string, label: string, href: string, badge?: number, hint?: string];
+  const sections: [string, Item[]][] = [
+    [
+      "Mon espace",
+      prefs.account
+        ? [
+            ["♡", "Favoris", "/favorites"],
+            ["👥", "Amis", "/friends", unread("friend:")],
+            ["🔔", "Notifications", "/notifications", inbox.unread],
+            ["👤", "Mon compte", "/account", 0, prefs.account.pseudo],
+          ]
+        : [
+            ["♡", "Favoris", "/favorites"],
+            ["👤", "Se connecter", "/login"],
+          ],
+    ],
+    [
+      "Outils F1",
+      [
+        ["⚔", "Duel de pilotes", "/duel"],
+        ["🏎", "Duel d’écuries", "/teams-duel"],
+        ["🧮", "Simulateur de championnat", "/simulator"],
+      ],
+    ],
+    [
+      "Appli",
+      [
+        [
+          "◈",
+          "Anti-spoil",
+          "/settings",
+          0,
+          protectedCount ? `${protectedCount} session(s) protégée(s)` : "désactivé",
+        ],
+        ["⚙", "Réglages", "/settings"],
+        ...(prefs.account ? [["💬", "Donner mon avis", "/feedback"] as Item] : []),
+        ...(admin ? [["📊", "Tableau de bord admin", "/admin"] as Item] : []),
+      ],
+    ],
+  ];
+  const go = (href: string) => {
+    onClose();
+    // Favoris et Réglages sont des onglets cachés : on y navigue sans empiler.
+    if (href === "/favorites" || href === "/settings") router.navigate(href);
+    else router.push(href as never);
+  };
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1, flexDirection: "row" }}>
+        <SafeAreaView
+          edges={["top", "bottom"]}
+          style={{ width: "82%", maxWidth: 340, backgroundColor: c.bg }}
+        >
+          <ScrollView contentContainerStyle={{ padding: 20, gap: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <Text style={[s.brand, { flex: 1 }]}>
+                Keep <Text style={{ color: c.accent }}>Pushing.</Text>
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fermer le menu"
+                onPress={onClose}
+                style={s.iconButton}
+              >
+                <Text style={{ color: c.ink, fontSize: 20 }}>✕</Text>
+              </Pressable>
+            </View>
+            {sections.map(([title, items]) => (
+              <View key={title} style={{ gap: 2, marginTop: 10 }}>
+                <Text style={s.label}>{title.toUpperCase()}</Text>
+                {items.map(([icon, label, href, badge, hint]) => (
+                  <Pressable
+                    key={label}
+                    accessibilityRole="button"
+                    accessibilityLabel={badge ? `${label} : ${badge} nouveauté(s)` : label}
+                    onPress={() => go(href)}
+                    style={({ pressed }) => [s.menuItem, pressed && { backgroundColor: c.chip }]}
+                  >
+                    <Text style={{ width: 30, fontSize: 18, color: c.ink }}>{icon}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.text}>{label}</Text>
+                      {!!hint && <Text style={s.small}>{hint}</Text>}
+                    </View>
+                    {!!badge && (
+                      <Text style={[s.dot, { position: "relative", top: 0, right: 0 }]}>
+                        {badge}
+                      </Text>
+                    )}
+                    <Text style={[s.small, { marginLeft: 8 }]}>›</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+        <Pressable
+          accessibilityLabel="Fermer le menu"
+          onPress={onClose}
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)" }}
+        />
+      </View>
+    </Modal>
   );
 }
 
@@ -347,6 +467,36 @@ const makeStyles = (c: typeof light) =>
       fontStyle: "italic",
       letterSpacing: -1,
       color: c.ink,
+    },
+    iconButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 12,
+      backgroundColor: c.chip,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dot: {
+      position: "absolute",
+      top: 4,
+      right: 4,
+      minWidth: 18,
+      paddingHorizontal: 4,
+      borderRadius: 9,
+      overflow: "hidden",
+      backgroundColor: c.accentBg,
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: "700",
+      textAlign: "center",
+      lineHeight: 18,
+    },
+    menuItem: {
+      minHeight: 52,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 8,
+      borderRadius: 10,
     },
     shield: {
       minWidth: 64,

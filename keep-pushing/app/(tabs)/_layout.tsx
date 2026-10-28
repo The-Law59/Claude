@@ -9,8 +9,6 @@ const tabs = [
   ["pronos", "◎", "Pronos"],
   ["forum", "❝", "Forum"],
   ["season", "▦", "Saison"],
-  ["favorites", "♡", "Favoris"],
-  ["settings", "☷", "Réglages"],
 ];
 
 export default function TabsLayout() {
@@ -45,8 +43,10 @@ export default function TabsLayout() {
           }}
         />
       ))}
-      {/* Dernière course : ouverte depuis l'accueil, pas d'onglet dédié. */}
+      {/* Dernière course : ouverte depuis l'accueil ; Favoris et Réglages : menu ☰. */}
       <Tabs.Screen name="live" options={{ href: null }} />
+      <Tabs.Screen name="favorites" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
 }
