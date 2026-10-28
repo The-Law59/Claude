@@ -112,16 +112,22 @@ export default function BetWizard() {
       .find((d) => d.id === id)
       ?.name.split(" ")
       .at(-1) ?? "—";
-  const next = () => setStep((n) => n + 1);
+  // Avance d'une étape, une seule fois même en cas de double appui.
+  const next = () => setStep((n) => (n === step ? n + 1 : n));
   const pickDriver = (id: string) => {
     const cur = steps[step];
-    if (cur.kind === "fastest") setBet({ ...bet, fastest: id });
+    if (cur.kind === "fastest") setBet((b) => ({ ...b, fastest: id }));
     else if (cur.kind === "slot") {
-      const list = [...(bet[cur.part] ?? Array(PARTS[cur.part].size).fill(""))];
-      const before = list.indexOf(id);
-      if (before !== -1) list[before] = list[cur.i]; // déjà placé : on échange
-      list[cur.i] = id;
-      setBet({ ...bet, [cur.part]: list });
+      // Un pilote déjà placé ailleurs dans ce classement n'est pas sélectionnable :
+      // pour le déplacer, revenir à sa place avec « Retour ».
+      const placed = (bet[cur.part] ?? []).indexOf(id);
+      if (placed !== -1 && placed !== cur.i) return;
+      setBet((b) => {
+        const list = [...(b[cur.part] ?? Array(PARTS[cur.part].size).fill(""))];
+        if (list.some((x, i) => x === id && i !== cur.i)) return b;
+        list[cur.i] = id;
+        return { ...b, [cur.part]: list };
+      });
     }
     next();
   };
@@ -144,6 +150,8 @@ export default function BetWizard() {
       const list = bet[part] ?? [];
       if (list.length && list.some((x) => !x))
         return setError(`Il manque des places en ${PART_LABEL[part]}.`);
+      if (new Set(list).size !== list.length)
+        return setError(`Un pilote est en double en ${PART_LABEL[part]}.`);
       body[part] = list.length ? list : null;
     }
     if (open("fastest")) {
@@ -261,15 +269,24 @@ export default function BetWizard() {
             {current ? ` · choix actuel : ${last(current)}` : ""}
           </Text>
         )}
+        {cur.kind === "slot" && (
+          <Text style={s.small}>
+            Les pilotes grisés sont déjà placés : « Retour » pour changer leur place.
+          </Text>
+        )}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
           {season.drivers.map((d) => {
             const placed = taken.indexOf(d.id);
             const mine = d.id === current;
+            // Déjà placé ailleurs dans ce classement : grisé et désactivé.
+            const locked = cur.kind === "slot" && placed !== -1 && !mine;
             return (
               <Pressable
                 key={d.id}
                 accessibilityRole="button"
                 accessibilityLabel={d.name}
+                accessibilityState={{ disabled: locked, selected: mine }}
+                disabled={locked}
                 onPress={() => pickDriver(d.id)}
                 style={{
                   width: "48%",
