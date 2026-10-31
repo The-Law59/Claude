@@ -1,17 +1,17 @@
-# Graph Report - Claude  (2026-10-28)
+# Graph Report - Claude  (2026-10-31)
 
 ## Corpus Check
-- 85 files · ~55,990 words
+- 85 files · ~56,443 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 4 file(s) not represented in the graph (top: (none) 4)
 
 ## Summary
-- 645 nodes · 1808 edges · 20 communities (15 shown, 5 thin omitted)
+- 650 nodes · 1819 edges · 21 communities (16 shown, 5 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 15 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `12d77842`
+- Built from commit: `3e7aa9ad`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -22,7 +22,7 @@
 - game.test.mjs
 - server.mjs
 - package.json
-- ref_node_test
+- ref_node_assert
 - jolpica.mjs
 - simulator.tsx
 - Installer Keep Pushing sur Proxmox
@@ -36,6 +36,7 @@
 - install-lxc.sh
 - VALIDATION.md
 - community.mjs
+- app/_layout.tsx
 
 ## God Nodes (most connected - your core abstractions)
 1. `useTheme()` - 85 edges
@@ -64,39 +65,39 @@
 ## Import Cycles
 - None detected.
 
-## Communities (20 total, 5 thin omitted)
+## Communities (21 total, 5 thin omitted)
 
 ### Community 0 - "useTheme"
 Cohesion: 0.06
-Nodes (114): Account(), Admin(), EXPORTS, Stats, Article(), ASK, Bet, BetWizard() (+106 more)
+Nodes (121): Account(), Admin(), EXPORTS, Stats, Article(), ASK, Bet, BetWizard() (+113 more)
 
 ### Community 1 - "fail"
 Cohesion: 0.06
-Nodes (64): bearer(), changePassword(), changePseudo(), confirm(), deleteAccount(), exportData(), addFriend(), authenticate() (+56 more)
+Nodes (65): bearer(), changePassword(), changePseudo(), confirm(), deleteAccount(), exportData(), addFriend(), authenticate() (+57 more)
 
 ### Community 2 - "store.tsx"
-Cohesion: 0.05
-Nodes (67): ErrorBoundary(), Gate(), RootLayout(), refreshNews(), API_URL, installCrashReporting(), reportCrash(), articles (+59 more)
+Cohesion: 0.06
+Nodes (60): refreshNews(), API_URL, articles, demoSeason, drivers, events, race, results (+52 more)
 
 ### Community 3 - "game.test.mjs"
-Cohesion: 0.09
-Nodes (36): AFTER_QUALI, answerOf(), closesAt(), dnfCount(), EXTRAS, history(), isClosed(), isOpen() (+28 more)
+Cohesion: 0.07
+Nodes (47): AFTER_QUALI, answerOf(), closesAt(), dnfCount(), EXTRAS, history(), isClosed(), isOpen() (+39 more)
 
 ### Community 4 - "server.mjs"
-Cohesion: 0.06
-Nodes (57): ADMINS, admobCache, admobKeys(), allowReport, allRounds(), api(), BACKUPS, betView() (+49 more)
+Cohesion: 0.07
+Nodes (47): ADMINS, admobCache, admobKeys(), allowReport, allRounds(), api(), BACKUPS, betView() (+39 more)
 
 ### Community 5 - "package.json"
-Cohesion: 0.05
-Nodes (43): dependencies, @anthropic-ai/sdk, expo, expo-constants, expo-linking, expo-notifications, expo-router, expo-status-bar (+35 more)
+Cohesion: 0.04
+Nodes (44): dependencies, @anthropic-ai/sdk, expo, expo-constants, expo-linking, expo-notifications, expo-router, expo-status-bar (+36 more)
 
-### Community 6 - "ref_node_test"
+### Community 6 - "ref_node_assert"
 Cohesion: 0.09
 Nodes (16): Regagner le joker ×2 avec des pubs, file, password, state, ADMOB_KEYS_URL, ADS_ENABLED, adsWatched(), jokerSource() (+8 more)
 
 ### Community 7 - "jolpica.mjs"
-Cohesion: 0.09
-Nodes (34): GrandPrix(), DuelResult, Row, Season, TeamsDuel(), refreshSeason(), at(), eventId() (+26 more)
+Cohesion: 0.11
+Nodes (30): additionsOf(), at(), driverKey(), eventId(), getJson(), LABELS, loadCircuitHistory(), loadDriverSeason() (+22 more)
 
 ### Community 8 - "simulator.tsx"
 Cohesion: 0.23
@@ -126,25 +127,29 @@ Nodes (7): compilerOptions, allowJs, checkJs, strict, extends, include, expo/tsc
 Cohesion: 0.16
 Nodes (23): block(), clean(), createTopic(), deletePost(), feedbackSummary(), forum(), GAP, hidden() (+15 more)
 
+### Community 20 - "app/_layout.tsx"
+Cohesion: 0.43
+Nodes (6): ErrorBoundary(), Gate(), RootLayout(), installCrashReporting(), reportCrash(), react-native-safe-area-context
+
 ## Knowledge Gaps
 - **10 isolated node(s):** `expo`, `expo-constants`, `expo-linking`, `react-dom`, `react-native-screens` (+5 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 234 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 235 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `useTheme()` connect `useTheme` to `store.tsx`, `jolpica.mjs`, `simulator.tsx`, `Installer Keep Pushing sur Proxmox`, `teams.mjs`?**
-  _High betweenness centrality (0.063) - this node is a cross-community bridge._
+- **Why does `useTheme()` connect `useTheme` to `simulator.tsx`, `Installer Keep Pushing sur Proxmox`, `app/_layout.tsx`, `teams.mjs`?**
+  _High betweenness centrality (0.062) - this node is a cross-community bridge._
 - **What connects `expo`, `expo-constants`, `expo-linking` to the rest of the system?**
   _10 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `useTheme` be split into smaller, more focused modules?**
-  _Cohesion score 0.0628714419768533 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05975363118220261 - nodes in this community are weakly interconnected._
 - **Why does `@anthropic-ai/sdk` connect `package.json` to `server.mjs`?**
-  _High betweenness centrality (0.048) - this node is a cross-community bridge._
+  _High betweenness centrality (0.047) - this node is a cross-community bridge._
 - **Should `fail` be split into smaller, more focused modules?**
-  _Cohesion score 0.061052631578947365 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05980861244019139 - nodes in this community are weakly interconnected._
 - **Why does `fail()` connect `fail` to `community.mjs`, `game.test.mjs`?**
-  _High betweenness centrality (0.044) - this node is a cross-community bridge._
+  _High betweenness centrality (0.043) - this node is a cross-community bridge._
 - **Should `store.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.05092276144907724 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05794556628621598 - nodes in this community are weakly interconnected._

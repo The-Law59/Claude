@@ -13,10 +13,32 @@ const at = (x) => `${x.date}T${x.time ?? "00:00:00Z"}`;
 const eventId = (race) => `f1-${race.season}-${race.round}`;
 const person = (d) => `${d.givenName} ${d.familyName}`;
 
+// Pilotes remplaçants annoncés mais pas encore dans les classements Jolpica
+// (un pilote n'y apparaît qu'après sa première course). Ajoutés à la saison
+// pour pouvoir être pariés ; le titulaire reste listé, au cas où le
+// remplacement ne dure qu'un week-end. Par année de saison.
+export const ROSTER_ADDITIONS = {
+  2026: [{ driverId: "hirakawa", givenName: "Ryo", familyName: "Hirakawa", constructorId: "haas" }],
+};
+const additionsOf = (season) => ROSTER_ADDITIONS[season] ?? [];
+// Même pilote si Jolpica lui donne un autre identifiant : on garde le nôtre,
+// pour que paris et résultats parlent du même pilote.
+const plainName = (t) =>
+  t
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+function driverKey(driver, season) {
+  const added = additionsOf(season).find(
+    (a) => plainName(a.familyName) === plainName(driver.familyName ?? ""),
+  );
+  return `driver-${added?.driverId ?? driver.driverId}`;
+}
+
 function rows(race, pick) {
   return (race?.Results ?? race?.SprintResults ?? race?.QualifyingResults ?? []).map((x) => ({
     position: Number(x.position),
-    driverId: `driver-${x.Driver.driverId}`,
+    driverId: driverKey(x.Driver, race?.season),
     name: person(x.Driver),
     team: x.Constructor.name,
     value: pick(x),
@@ -61,18 +83,23 @@ export function parseSeason({ schedule, winners, drivers, teams }) {
     };
   });
   const standings = (data, key) => data.StandingsTable.StandingsLists[0]?.[key] ?? [];
+  const year = schedule.RaceTable.season ?? schedule.RaceTable.Races[0]?.season;
   return {
     mode: "live",
     events,
     // Rempli Grand Prix par Grand Prix avec loadRound().
     results: {},
-    drivers: standings(drivers, "DriverStandings").map((d) => ({
-      id: `driver-${d.Driver.driverId}`,
-      name: person(d.Driver),
-      team: d.Constructors.at(-1)?.name ?? "",
-      teamId: `team-${d.Constructors.at(-1)?.constructorId}`,
-      points: Number(d.points),
-    })),
+    drivers: withAdditions(
+      standings(drivers, "DriverStandings").map((d) => ({
+        id: driverKey(d.Driver, year),
+        name: person(d.Driver),
+        team: d.Constructors.at(-1)?.name ?? "",
+        teamId: `team-${d.Constructors.at(-1)?.constructorId}`,
+        points: Number(d.points),
+      })),
+      standings(teams, "ConstructorStandings"),
+      year,
+    ),
     teams: standings(teams, "ConstructorStandings").map((t) => ({
       id: `team-${t.Constructor.constructorId}`,
       name: t.Constructor.name,
@@ -111,6 +138,21 @@ const getJson = async (fetchFn, path) => {
   if (!res.ok) throw new Error(`Jolpica ${res.status} sur ${path}`);
   return (await res.json()).MRData;
 };
+
+// Ajoute les remplaçants absents des classements, en fin de liste, à 0 point.
+function withAdditions(list, teams, season) {
+  const extra = additionsOf(season)
+    .filter((a) => !list.some((d) => d.id === `driver-${a.driverId}`))
+    .map((a) => ({
+      id: `driver-${a.driverId}`,
+      name: `${a.givenName} ${a.familyName}`,
+      team:
+        teams.find((t) => t.Constructor.constructorId === a.constructorId)?.Constructor.name ?? "",
+      teamId: `team-${a.constructorId}`,
+      points: 0,
+    }));
+  return [...list, ...extra];
+}
 
 export async function loadSeason(fetchFn = fetch) {
   // 4 requêtes au démarrage : Jolpica limite les rafales (4 req/s).
@@ -162,7 +204,9 @@ export function parseDriverSeason(results, qualifying) {
 export async function loadDriverSeason(driverId, fetchFn = fetch) {
   const id = driverId.replace(/^driver-/, "");
   const [results, qualifying] = await Promise.all(
-    ["results", "qualifying"].map((kind) => getJson(fetchFn, `/current/drivers/${id}/${kind}.json?limit=100`)),
+    ["results", "qualifying"].map((kind) =>
+      getJson(fetchFn, `/current/drivers/${id}/${kind}.json?limit=100`),
+    ),
   );
   return parseDriverSeason(results, qualifying);
 }
@@ -172,7 +216,12 @@ export function parseTeamSeason(results, sprints) {
   const rounds = {};
   const add = (races, key) => {
     for (const r of races.RaceTable.Races) {
-      const x = (rounds[r.round] ??= { round: Number(r.round), name: r.raceName, points: 0, best: null });
+      const x = (rounds[r.round] ??= {
+        round: Number(r.round),
+        name: r.raceName,
+        points: 0,
+        best: null,
+      });
       for (const row of r[key]) {
         x.points += Number(row.points);
         if (key === "Results") x.best = Math.min(x.best ?? 99, Number(row.position));
@@ -187,7 +236,9 @@ export function parseTeamSeason(results, sprints) {
 export async function loadTeamSeason(teamId, fetchFn = fetch) {
   const id = teamId.replace(/^team-/, "");
   const [results, sprints] = await Promise.all(
-    ["results", "sprint"].map((kind) => getJson(fetchFn, `/current/constructors/${id}/${kind}.json?limit=100`)),
+    ["results", "sprint"].map((kind) =>
+      getJson(fetchFn, `/current/constructors/${id}/${kind}.json?limit=100`),
+    ),
   );
   return parseTeamSeason(results, sprints);
 }
@@ -202,5 +253,7 @@ export function parseCircuitHistory(data) {
 }
 
 export async function loadCircuitHistory(circuitId, fetchFn = fetch) {
-  return parseCircuitHistory(await getJson(fetchFn, `/circuits/${circuitId}/results/1.json?limit=100`));
+  return parseCircuitHistory(
+    await getJson(fetchFn, `/circuits/${circuitId}/results/1.json?limit=100`),
+  );
 }

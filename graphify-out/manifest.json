@@ -270,9 +270,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/jolpica.mjs": {
-    "mtime": 1792007721.07193,
-    "seen": 1793111153.9280052,
-    "ast_hash": "224fde06375d524c3508de6d40decd3a",
+    "mtime": 1793467264.0940692,
+    "seen": 1793467349.8521044,
+    "ast_hash": "68f99ce5e1f45bff763931b6d1a29c62",
     "semantic_hash": ""
   },
   "keep-pushing/src/leagues.mjs": {
@@ -396,9 +396,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/tests/jolpica.test.mjs": {
-    "mtime": 1792007556.9647925,
-    "seen": 1793111153.9280276,
-    "ast_hash": "5204e022724e14cb0d49c460cd9f05fc",
+    "mtime": 1793467284.7780704,
+    "seen": 1793467349.8521352,
+    "ast_hash": "87cb326da7bceb3f8e2699ada4492fd5",
     "semantic_hash": ""
   },
   "keep-pushing/tests/model.test.mjs": {
@@ -468,9 +468,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/README.md": {
-    "mtime": 1793217771.4939358,
-    "seen": 1793217775.0363696,
-    "ast_hash": "46971ef1aeaab753a042923cc5ab64cb",
+    "mtime": 1793467346.9401038,
+    "seen": 1793467349.8521523,
+    "ast_hash": "60fa27ece7f7c705a01e5d15eb3eca86",
     "semantic_hash": ""
   },
   "keep-pushing/VALIDATION.md": {
