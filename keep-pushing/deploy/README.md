@@ -87,7 +87,8 @@ docker compose start
   Kuma sur une autre machine (ou un service gratuit comme UptimeRobot si le
   serveur est accessible depuis Internet).
 
-Mot de passe oublié par un joueur : l'app s'arrête une minute, le temps de
+Mot de passe oublié par un joueur : depuis le tableau de bord admin (Joueurs →
+« Nouveau mot de passe »), ou en console : l'app s'arrête une minute, le temps de
 lui en générer un nouveau (affiché à l'écran, à lui transmettre) :
 ```bash
 cd /opt/keep-pushing/keep-pushing
@@ -96,8 +97,9 @@ docker compose run --rm keep-pushing node scripts/reset-password.mjs <pseudo>
 docker compose start
 ```
 
-Prono oublié : un joueur qui a donné sa liste à un admin avant la fermeture
-peut être enregistré à sa place (noms de famille, accents facultatifs ;
+Prono oublié : le plus simple est le tableau de bord admin (Pronos par
+joueur → « Saisir »). En console, un joueur qui a donné sa liste à un admin
+avant la fermeture peut aussi être enregistré à sa place (noms de famille, accents facultatifs ;
 GP = numéro de manche ; partie = quali, sprint ou race) :
 ```bash
 cd /opt/keep-pushing/keep-pushing

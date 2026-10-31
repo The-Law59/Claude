@@ -1,6 +1,6 @@
 {
   "0": "useTheme",
-  "1": "fail",
+  "1": "community.mjs",
   "2": "store.tsx",
   "3": "game.test.mjs",
   "4": "server.mjs",
@@ -19,5 +19,9 @@
   "17": "install-lxc.sh",
   "18": "VALIDATION.md",
   "19": "mercato.mjs",
-  "20": "app/_layout.tsx"
+  "20": "app/_layout.tsx",
+  "21": "bet-wizard.tsx",
+  "22": "accounts.mjs",
+  "23": "fail",
+  "24": "account.mjs"
 }

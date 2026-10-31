@@ -87,7 +87,11 @@ export function exportData(state, user) {
 // les avis restent, anonymes, pour les statistiques.
 export async function deleteAccount(state, user, body) {
   await confirm(user, body?.password);
-  const id = user.id;
+  removeUser(state, user.id);
+}
+
+// Efface un joueur partout (aussi utilisé par les admins).
+export function removeUser(state, id) {
   delete state.users[id];
   for (const [h, s] of Object.entries(state.sessions))
     if (s.userId === id) delete state.sessions[h];

@@ -1,5 +1,9 @@
 // Tableau de bord des admins : l'appli prend-elle ? Joueurs actifs,
-// inscriptions, paris par GP, activité du forum, avis, erreurs ; exports CSV.
+// inscriptions, paris par GP, activité du forum, avis, erreurs ; gestion
+// des joueurs, pronos saisis à la place d'un joueur, erreurs ; exports CSV.
+import { PARTS } from "./bets.mjs";
+import { fail } from "./errors.mjs";
+
 const DAY = 86400000;
 
 // Lundi (UTC) de la semaine d'une date, « AAAA-MM-JJ ».
@@ -127,4 +131,63 @@ export function exportCsv(state, type, { points = () => 0 } = {}) {
       ]),
     );
   return null;
+}
+
+// --- Gestion.
+// Joueurs, les plus récemment vus d'abord. points(userId) : points de la saison.
+export function players(state, { points = () => 0, isAdmin = () => false } = {}) {
+  return Object.values(state.users ?? {})
+    .map((u) => ({
+      id: u.id,
+      pseudo: u.pseudo,
+      createdAt: u.createdAt,
+      lastSeen: u.lastSeen ?? null,
+      friends: u.friends.length,
+      leagues: Object.values(state.leagues ?? {}).filter((l) => l.members.includes(u.id)).length,
+      bets: Object.values(state.bets ?? {}).filter((b) => b[u.id]).length,
+      points: points(u.id),
+      admin: isAdmin(u),
+    }))
+    .sort((a, b) => (b.lastSeen ?? b.createdAt) - (a.lastSeen ?? a.createdAt));
+}
+
+// Pronos d'un GP : chaque joueur, avec ou sans prono.
+export function betsOf(state, eventId) {
+  const byUser = state.bets?.[eventId] ?? {};
+  const byAdmin = (state.adminBets ?? []).filter((x) => x.eventId === eventId);
+  return Object.values(state.users ?? {})
+    .map((u) => ({
+      id: u.id,
+      pseudo: u.pseudo,
+      // Un prono sans aucune partie (envoi après fermeture) ne compte pas.
+      bet: Object.keys(byUser[u.id] ?? {}).some((k) => k !== "at") ? byUser[u.id] : null,
+      byAdmin: [...new Set(byAdmin.filter((x) => x.userId === u.id).map((x) => x.part))],
+    }))
+    .sort((a, b) => Number(!!b.bet) - Number(!!a.bet) || a.pseudo.localeCompare(b.pseudo));
+}
+
+// Prono saisi par un admin à la place d'un joueur, même partie fermée.
+export function setBetFor(
+  state,
+  { eventId, userId, part, ids, by },
+  { driverIds, now = Date.now() },
+) {
+  if (!state.users?.[userId]) fail(404, "Joueur introuvable.");
+  if (!PARTS[part]) fail(400, "Partie inconnue.");
+  if (!Array.isArray(ids) || ids.length !== PARTS[part].size)
+    fail(400, `Il faut ${PARTS[part].size} pilotes.`);
+  if (!ids.every((id) => driverIds.includes(id))) fail(400, "Pilote inconnu.");
+  if (new Set(ids).size !== ids.length) fail(400, "Un pilote est en double.");
+  state.bets ??= {};
+  state.bets[eventId] ??= {};
+  (state.bets[eventId][userId] ??= {})[part] = ids;
+  (state.adminBets ??= []).push({ userId, eventId, part, ids, by, at: now });
+  return state.bets[eventId][userId];
+}
+
+// Erreur réglée : retirée de la liste (toutes si signature absente).
+export function resolveErrors(state, signature) {
+  const before = (state.errors ?? []).length;
+  state.errors = signature ? (state.errors ?? []).filter((e) => e.signature !== signature) : [];
+  return before - state.errors.length;
 }

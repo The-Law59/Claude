@@ -4,6 +4,7 @@
 //   ANTHROPIC_API_KEY est défini (les navigateurs ne peuvent pas lire les flux) ;
 // - /api/… comptes, amis et paris (data/game.json).
 import { createServer } from "node:http";
+import { randomBytes } from "node:crypto";
 import { copyFile, readFile, readdir, rm, writeFile, mkdir } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
@@ -671,16 +672,77 @@ async function api(req, path) {
       },
     ];
   }
-  const exportRoute = path.match(/^\/api\/admin\/export\/(\w+)$/);
-  if (exportRoute) {
-    adminOnly();
+  // Points de la saison en cours, par joueur.
+  const seasonTotals = async () => {
     const all = await allRounds();
     const current = Object.fromEntries(
       Object.entries(all).filter(([key]) => seasons.seasonOf(key) === seasonId()),
     );
-    const totals = Object.fromEntries(
+    return Object.fromEntries(
       bets.leaderboard(Object.keys(state.users), current).map((r) => [r.id, r.points]),
     );
+  };
+  if (path === "/api/admin/players") {
+    adminOnly();
+    const totals = await seasonTotals();
+    return [
+      200,
+      admin.players(state, {
+        points: (id) => totals[id] ?? 0,
+        isAdmin: (u) => community.isAdmin(u, ADMINS),
+      }),
+    ];
+  }
+  const player = path.match(/^\/api\/admin\/players\/([\w-]+)(\/password)?$/);
+  if (player) {
+    const me = adminOnly();
+    const target = state.users[player[1]];
+    if (!target) return [404, { error: "Joueur introuvable." }];
+    if (player[2] && req.method === "POST") {
+      // Nouveau mot de passe à transmettre au joueur ; ses appareils sont déconnectés.
+      const password = randomBytes(6).toString("base64url");
+      await accounts.resetPassword(state, target.pseudo, password);
+      await save();
+      return [200, { pseudo: target.pseudo, password }];
+    }
+    if (!player[2] && req.method === "DELETE") {
+      if (target.id === me.id)
+        return [400, { error: "Utilisez « Mon compte » pour votre compte." }];
+      if (community.isAdmin(target, ADMINS))
+        return [403, { error: "Retirez-le d’abord de ADMINS pour supprimer un admin." }];
+      account.removeUser(state, target.id);
+      await save();
+      return [200, { ok: true }];
+    }
+    return [405, { error: "Méthode non permise." }];
+  }
+  const adminBets = path.match(/^\/api\/admin\/bets\/([\w-]+)(?:\/([\w-]+))?$/);
+  if (adminBets) {
+    const me = adminOnly();
+    const event = findEvent(adminBets[1]);
+    if (!event) return [404, { error: "Grand Prix inconnu." }];
+    if (adminBets[2] && req.method === "PUT") {
+      const body = await readJson(req);
+      admin.setBetFor(
+        state,
+        { eventId: event.id, userId: adminBets[2], part: body?.part, ids: body?.ids, by: me.id },
+        { driverIds: season.drivers.map((d) => d.id) },
+      );
+      await save();
+    }
+    return [200, { parts: bets.partsOf(event), rows: admin.betsOf(state, event.id) }];
+  }
+  if (path === "/api/admin/errors/resolve" && req.method === "POST") {
+    adminOnly();
+    const body = await readJson(req);
+    admin.resolveErrors(state, body?.all ? null : String(body?.signature ?? "-"));
+    await save();
+    return [200, { errors: (state.errors ?? []).slice(0, 20), total: (state.errors ?? []).length }];
+  }
+  const exportRoute = path.match(/^\/api\/admin\/export\/(\w+)$/);
+  if (exportRoute) {
+    adminOnly();
+    const totals = await seasonTotals();
     const csv = admin.exportCsv(state, exportRoute[1], { points: (id) => totals[id] ?? 0 });
     if (csv === null) return [404, { error: "Export inconnu." }];
     const day = new Date().toISOString().slice(0, 10);

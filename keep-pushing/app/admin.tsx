@@ -1,6 +1,8 @@
-import { useCallback, useState } from "react";
-import { Platform, Pressable, Share, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Platform, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
+import { PARTS } from "../src/bets.mjs";
+import { useStore } from "../src/store";
 import { Button, Screen, formatDate, useCall, useTheme } from "../src/ui";
 
 type Stats = {
@@ -61,6 +63,19 @@ export default function Admin() {
       setNotice(`${filename} prêt.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Export impossible.");
+    }
+  };
+  const resolve = async (signature: string | null) => {
+    try {
+      const r = await call("/api/admin/errors/resolve", {
+        method: "POST",
+        body: signature ? { signature } : { all: true },
+      });
+      setData(
+        (d) => d && { ...d, latestErrors: r.errors, errors: { ...d.errors, total: r.total } },
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Action impossible.");
     }
   };
   const back = (
@@ -139,6 +154,8 @@ export default function Admin() {
         )}
       </View>
 
+      <PlayersAdmin />
+
       <Text style={s.heading}>Pronos</Text>
       <View style={s.card}>
         <Text style={s.label}>JOUEURS AYANT PARIÉ, PAR GP</Text>
@@ -152,6 +169,7 @@ export default function Admin() {
         )}
         {!data.bets.length && <Text style={s.small}>Aucun pari cette saison.</Text>}
       </View>
+      <BetsAdmin />
 
       <Text style={s.heading}>Communauté</Text>
       <View style={[s.card, { flexDirection: "row" }]}>
@@ -171,6 +189,9 @@ export default function Admin() {
         {data.errors.last24h} sur les dernières 24 h · {data.errors.total} erreur
         {data.errors.total > 1 ? "s différentes gardées" : " gardée"}.
       </Text>
+      {data.latestErrors.length > 1 && (
+        <Button label="✓ Tout marquer comme réglé" secondary onPress={() => resolve(null)} />
+      )}
       {data.latestErrors.map((e) => (
         <Pressable
           key={e.signature}
@@ -193,18 +214,351 @@ export default function Admin() {
               {e.stack}
             </Text>
           )}
+          {open === e.signature && (
+            <Button
+              label="✓ Réglée : retirer de la liste"
+              secondary
+              onPress={() => resolve(e.signature)}
+            />
+          )}
         </Pressable>
       ))}
       {!data.latestErrors.length && <Text style={s.small}>Aucune erreur enregistrée. 🎉</Text>}
 
-      <Text style={s.heading}>Exports CSV</Text>
-      <View style={s.pills}>
-        {EXPORTS.map(([type, label]) => (
-          <Button key={type} label={`⬇ ${label}`} secondary onPress={() => download(type)} />
+      <Text style={[s.small, { marginTop: 24 }]}>
+        Exporter en CSV (Excel, sauvegarde) :{" "}
+        {EXPORTS.map(([type, label], i) => (
+          <Text
+            key={type}
+            accessibilityRole="link"
+            onPress={() => download(type)}
+            style={{ color: c.accent, textDecorationLine: "underline" }}
+          >
+            {label.toLowerCase()}
+            {i < EXPORTS.length - 1 ? " · " : ""}
+          </Text>
         ))}
-      </View>
+      </Text>
       {!!notice && <Text style={s.small}>{notice}</Text>}
-      <Text style={s.small}>Séparateur « ; » : s’ouvre directement dans Excel ou LibreOffice.</Text>
     </Screen>
+  );
+}
+
+// --- Joueurs : recherche, nouveau mot de passe, suppression.
+type Player = {
+  id: string;
+  pseudo: string;
+  createdAt: number;
+  lastSeen: number | null;
+  friends: number;
+  leagues: number;
+  bets: number;
+  points: number;
+  admin: boolean;
+};
+function PlayersAdmin() {
+  const { s, c } = useTheme();
+  const call = useCall();
+  const [list, setList] = useState<Player[] | null>(null);
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ id: string; text: string } | null>(null);
+  const load = useCallback(() => {
+    call("/api/admin/players")
+      .then(setList)
+      .catch(() => setList([]));
+  }, [call]);
+  useEffect(load, [load]);
+  if (!list) return <Text style={s.small}>Chargement des joueurs…</Text>;
+  const shown = list.filter((p) => p.pseudo.toLowerCase().includes(query.trim().toLowerCase()));
+  const act = async (p: Player, kind: "password" | "delete") => {
+    try {
+      if (kind === "password") {
+        const r = await call(`/api/admin/players/${p.id}/password`, { method: "POST" });
+        setMessage({ id: p.id, text: `Nouveau mot de passe de ${r.pseudo} : ${r.password}` });
+      } else {
+        await call(`/api/admin/players/${p.id}`, { method: "DELETE" });
+        setMessage(null);
+        setOpen(null);
+        load();
+      }
+    } catch (e) {
+      setMessage({ id: p.id, text: e instanceof Error ? e.message : "Action impossible." });
+    }
+    setConfirm(null);
+  };
+  return (
+    <View style={s.card}>
+      <Text style={s.label}>LISTE DES JOUEURS ({list.length})</Text>
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Rechercher un pseudo"
+        autoCapitalize="none"
+        autoCorrect={false}
+        style={{
+          borderWidth: 1,
+          borderColor: c.line,
+          borderRadius: 10,
+          padding: 12,
+          fontSize: 16,
+          color: c.ink,
+          backgroundColor: c.card,
+        }}
+      />
+      {shown.slice(0, 50).map((p) => (
+        <View key={p.id} style={{ borderBottomWidth: 1, borderBottomColor: c.line }}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setOpen(open === p.id ? null : p.id)}
+            style={{ flexDirection: "row", alignItems: "center", minHeight: 48, gap: 8 }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={s.text}>
+                {p.pseudo}
+                {p.admin ? " · admin" : ""}
+              </Text>
+              <Text style={s.small}>
+                vu {p.lastSeen ? formatDate(p.lastSeen) : "jamais"} · {p.bets} GP pariés
+              </Text>
+            </View>
+            <Text style={s.time}>{p.points} pts</Text>
+            <Text style={s.small}>{open === p.id ? "▴" : "▾"}</Text>
+          </Pressable>
+          {open === p.id && (
+            <View style={{ gap: 8, paddingBottom: 12 }}>
+              <Text style={s.small}>
+                Inscrit le {formatDate(p.createdAt)} · {p.friends} ami(s) · {p.leagues} ligue(s)
+              </Text>
+              {message?.id === p.id && (
+                <Text selectable style={[s.text, { color: c.accent }]}>
+                  {message.text}
+                </Text>
+              )}
+              <Button
+                label="🔑 Nouveau mot de passe"
+                secondary
+                onPress={() => act(p, "password")}
+              />
+              {!p.admin &&
+                (confirm === p.id ? (
+                  <View style={{ gap: 8 }}>
+                    <Text style={s.error}>
+                      Supprimer {p.pseudo} ? Paris, amitiés et messages seront effacés.
+                    </Text>
+                    <Button
+                      label="Oui, supprimer définitivement"
+                      onPress={() => act(p, "delete")}
+                    />
+                    <Button label="Annuler" secondary onPress={() => setConfirm(null)} />
+                  </View>
+                ) : (
+                  <Button
+                    label="🗑 Supprimer ce compte"
+                    secondary
+                    onPress={() => setConfirm(p.id)}
+                  />
+                ))}
+            </View>
+          )}
+        </View>
+      ))}
+      {shown.length > 50 && (
+        <Text style={s.small}>50 premiers affichés : affinez la recherche.</Text>
+      )}
+      {!shown.length && <Text style={s.small}>Aucun joueur trouvé.</Text>}
+    </View>
+  );
+}
+
+// --- Pronos d'un GP : qui a parié, et saisie d'un prono oublié.
+type Part = keyof typeof PARTS;
+type BetRow = {
+  id: string;
+  pseudo: string;
+  bet: Partial<Record<Part, string[]>> | null;
+  byAdmin: string[];
+};
+const PART_LABEL: Record<Part, string> = { quali: "Qualifs", sprint: "Sprint", race: "Course" };
+function BetsAdmin() {
+  const { s, c, team } = useTheme();
+  const { season, focus } = useStore();
+  const call = useCall();
+  const events = season.events;
+  const [index, setIndex] = useState(() =>
+    Math.max(
+      0,
+      events.findIndex((e) => e.id === focus.current.id),
+    ),
+  );
+  const event = events[index];
+  const [data, setData] = useState<{ parts: Part[]; rows: BetRow[] } | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [edit, setEdit] = useState<{ userId: string; part: Part; ids: string[] } | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!event) return;
+    setData(null);
+    setEdit(null);
+    call(`/api/admin/bets/${event.id}`)
+      .then(setData)
+      .catch((e) => setError(e.message));
+  }, [event?.id, call]);
+  if (!event) return null;
+  const last = (id: string) =>
+    season.drivers
+      .find((d) => d.id === id)
+      ?.name.split(" ")
+      .at(-1) ?? id;
+  const save = async () => {
+    if (!edit) return;
+    try {
+      setData(
+        await call(`/api/admin/bets/${event.id}/${edit.userId}`, {
+          method: "PUT",
+          body: { part: edit.part, ids: edit.ids },
+        }),
+      );
+      setEdit(null);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Enregistrement impossible.");
+    }
+  };
+  const done = data?.rows.filter((r) => r.bet).length ?? 0;
+  return (
+    <View style={s.card}>
+      <Text style={s.label}>PRONOS PAR JOUEUR</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Button label="‹" secondary onPress={() => setIndex(Math.max(0, index - 1))} />
+        <View style={{ flex: 1 }}>
+          <Text style={s.cardTitle} numberOfLines={1}>
+            {event.round}. {event.name.replace(" Grand Prix", "")}
+          </Text>
+          {data && (
+            <Text style={s.small}>
+              {done} joueur(s) sur {data.rows.length} ont parié
+            </Text>
+          )}
+        </View>
+        <Button
+          label="›"
+          secondary
+          onPress={() => setIndex(Math.min(events.length - 1, index + 1))}
+        />
+      </View>
+      {!!error && <Text style={s.error}>{error}</Text>}
+      {!data && <Text style={s.small}>Chargement…</Text>}
+      {data?.rows.map((r) => (
+        <View key={r.id} style={{ borderBottomWidth: 1, borderBottomColor: c.line }}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setOpen(open === r.id ? null : r.id);
+              setEdit(null);
+            }}
+            style={{ flexDirection: "row", alignItems: "center", minHeight: 48, gap: 8 }}
+          >
+            <Text style={[s.text, { flex: 1 }]}>{r.pseudo}</Text>
+            {data.parts.map((p) => (
+              <Text key={p} style={[s.small, { color: r.bet?.[p] ? c.green : c.muted, width: 58 }]}>
+                {r.bet?.[p] ? "✓" : "—"} {PART_LABEL[p]}
+              </Text>
+            ))}
+          </Pressable>
+          {open === r.id && (
+            <View style={{ gap: 8, paddingBottom: 12 }}>
+              {data.parts.map((p) => (
+                <View key={p} style={{ gap: 4 }}>
+                  <Text style={s.small}>
+                    {PART_LABEL[p].toUpperCase()}
+                    {r.byAdmin.includes(p) ? " · saisi par un admin" : ""}
+                  </Text>
+                  <Text style={s.text}>
+                    {r.bet?.[p]?.map((id, i) => `${i + 1}. ${last(id)}`).join("  ") ||
+                      "Pas de prono."}
+                  </Text>
+                  {edit?.userId !== r.id && (
+                    <Button
+                      label={`✏️ Saisir ${PART_LABEL[p].toLowerCase()} pour ${r.pseudo}`}
+                      secondary
+                      onPress={() => setEdit({ userId: r.id, part: p, ids: r.bet?.[p] ?? [] })}
+                    />
+                  )}
+                </View>
+              ))}
+              {edit?.userId === r.id && (
+                <View style={{ gap: 8 }}>
+                  <Text style={s.label}>
+                    {PART_LABEL[edit.part].toUpperCase()} · {edit.ids.length}/
+                    {PARTS[edit.part].size}
+                  </Text>
+                  <Text style={s.small}>
+                    Touchez les pilotes dans l’ordre (1er, 2e…) ; retouchez un pilote pour le
+                    retirer.
+                  </Text>
+                  <Text style={s.text}>
+                    {edit.ids.map((id, i) => `${i + 1}. ${last(id)}`).join("  ") || "—"}
+                  </Text>
+                  <View style={s.pills}>
+                    {season.drivers.map((d) => {
+                      const at = edit.ids.indexOf(d.id);
+                      return (
+                        <Pressable
+                          key={d.id}
+                          accessibilityRole="button"
+                          accessibilityLabel={d.name}
+                          onPress={() =>
+                            setEdit({
+                              ...edit,
+                              ids:
+                                at !== -1
+                                  ? edit.ids.filter((x) => x !== d.id)
+                                  : edit.ids.length < PARTS[edit.part].size
+                                    ? [...edit.ids, d.id]
+                                    : edit.ids,
+                            })
+                          }
+                          style={[
+                            s.pill,
+                            { borderColor: team(d.teamId) },
+                            at !== -1 && { backgroundColor: c.soft, borderWidth: 2 },
+                          ]}
+                        >
+                          <Text style={[s.text, { color: team(d.teamId) }]}>
+                            {at !== -1 ? `${at + 1}. ` : ""}
+                            {d.name.split(" ").at(-1)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        label="Vider"
+                        secondary
+                        onPress={() => setEdit({ ...edit, ids: [] })}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Button label="Annuler" secondary onPress={() => setEdit(null)} />
+                    </View>
+                  </View>
+                  {edit.ids.length === PARTS[edit.part].size && (
+                    <Button label={`✅ Enregistrer pour ${r.pseudo}`} onPress={save} />
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+      ))}
+      <Text style={s.small}>
+        Un prono saisi ici compte même si la partie est fermée : réservez-le aux joueurs qui vous
+        ont donné leur liste avant la fermeture.
+      </Text>
+    </View>
   );
 }
