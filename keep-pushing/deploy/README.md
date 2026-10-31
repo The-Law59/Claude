@@ -96,6 +96,16 @@ docker compose run --rm keep-pushing node scripts/reset-password.mjs <pseudo>
 docker compose start
 ```
 
+Prono oublié : un joueur qui a donné sa liste à un admin avant la fermeture
+peut être enregistré à sa place (noms de famille, accents facultatifs ;
+GP = numéro de manche ; partie = quali, sprint ou race) :
+```bash
+cd /opt/keep-pushing/keep-pushing
+docker compose stop
+docker compose run --rm keep-pushing node scripts/add-bet.mjs <pseudo> 19 quali "Antonelli,Russell,Leclerc,Hamilton,Norris,Piastri,Verstappen,Hadjar,Hulkenberg,Hirakawa"
+docker compose start
+```
+
 ## Essais libres (fournisseur à choisir)
 
 Jolpica ne publie pas les essais libres ni la qualif sprint. Le serveur a un
