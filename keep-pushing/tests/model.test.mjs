@@ -13,6 +13,12 @@ import {
   reminderPlan,
   focusEvents,
   setMine,
+  betReminderPlan,
+  applySynced,
+  syncedPart,
+  SYNCED,
+  teamDuel,
+  askFeedback,
 } from "../src/model.mjs";
 test("Une session protégée masque son article même dans toute la F1", () => {
   const p = setProtected(defaults(), RACE, true);
@@ -22,11 +28,7 @@ test("Une session protégée masque son article même dans toute la F1", () => {
   assert.equal(notificationAllowed({ ...a, kind: "result" }, p), false);
 });
 test("Débloquer les qualifications ne débloque pas la course", () => {
-  const p = setProtected(
-    protectWeekend(defaults(), sessions, true),
-    QUALI,
-    false,
-  );
+  const p = setProtected(protectWeekend(defaults(), sessions, true), QUALI, false);
   assert(!p.protectedSessions.includes(QUALI));
   assert(p.protectedSessions.includes(RACE));
   assert(
@@ -75,12 +77,7 @@ test("Filtres favoris, rumeurs et importance sont indépendants", () => {
     ),
   );
   assert(!notificationAllowed({ ...articles[0], kind: "news" }, p));
-  assert(
-    notificationAllowed(
-      { ...articles[0], kind: "news" },
-      { ...p, frequency: "all" },
-    ),
-  );
+  assert(notificationAllowed({ ...articles[0], kind: "news" }, { ...p, frequency: "all" }));
 });
 test("Préférences corrompues ou ancien format : reprise sûre", () => {
   assert.deepEqual(restorePreferences("{oops", sessions), defaults());
@@ -94,17 +91,16 @@ test("Préférences corrompues ou ancien format : reprise sûre", () => {
 });
 test("Le plan de rappel applique le délai exact et désactivation", () => {
   const p = { ...defaults(), reminders: true, reminderMinutes: 10 };
-  assert.equal(
-    reminderPlan(sessions, p, 0)[0].date,
-    Date.parse(sessions[0].startsAt) - 600000,
-  );
+  assert.equal(reminderPlan(sessions, p, 0)[0].date, Date.parse(sessions[0].startsAt) - 600000);
   assert.deepEqual(reminderPlan(sessions, defaults(), 0), []);
 });
 test("Les ids de session sont propres à chaque week-end", () => {
   const p = setProtected(defaults(), RACE, true);
   assert(!p.protectedSessions.includes("f1-demo-2:Race"));
   const other = [{ id: "f1-demo-2:Race" }];
-  assert(protectWeekend(protectWeekend(p, other, true), other, false).protectedSessions.includes(RACE));
+  assert(
+    protectWeekend(protectWeekend(p, other, true), other, false).protectedSessions.includes(RACE),
+  );
   assert.equal(new Set(sessions.map((x) => x.id)).size, sessions.length);
 });
 test("Week-end en cours et dernier week-end selon la date", () => {
@@ -128,4 +124,199 @@ test("Mon pilote et mon écurie : choisis, ajoutés aux favoris, restaurés", ()
   const back = restorePreferences(JSON.stringify(p), sessions);
   assert.equal(back.myTeam, "team-ferrari");
   assert.equal(restorePreferences(JSON.stringify({ ...p, myDriver: 3 }), sessions).myDriver, "");
+});
+
+import { autoProtect } from "../src/model.mjs";
+
+test("Anti-spoil automatique : courses protégées 5 min avant, jamais une session déjà vue", () => {
+  const raceStart = Date.parse(sessions.at(-1).startsAt);
+  const quali = sessions.at(-2);
+  const on = { ...defaults(), autoProtect: "race" };
+  const events = demoSeason.events;
+  // Trop tôt : rien ; 4 min avant : la course est protégée, pas les qualifs.
+  assert.equal(autoProtect(on, events, raceStart - 10 * 60000), on);
+  const p = autoProtect(on, events, raceStart - 4 * 60000);
+  assert.deepEqual(p.protectedSessions, [RACE]);
+  // Débloquée par l'utilisateur : reste visible, même au rafraîchissement suivant.
+  const seen = setProtected(p, RACE, false);
+  assert.deepEqual(autoProtect(seen, events, raceStart + 3600000).protectedSessions, []);
+  // Plus de 48 h après : on ne protège plus.
+  assert.deepEqual(autoProtect(on, events, raceStart + 49 * 3600000).protectedSessions, []);
+  // Mode week-end : les qualifications aussi.
+  const all = autoProtect({ ...on, autoProtect: "weekend" }, events, Date.parse(quali.startsAt));
+  assert(all.protectedSessions.includes(QUALI));
+  const off = defaults(); // désactivé par défaut : préférences inchangées
+  assert.equal(autoProtect(off, events, raceStart), off);
+});
+
+test("Reprotéger une session efface sa marque « vue »", () => {
+  const seen = setProtected(defaults(), RACE, false);
+  assert.deepEqual(seen.revealed, [RACE]);
+  assert.deepEqual(setProtected(seen, RACE, true).revealed, []);
+  const back = restorePreferences(JSON.stringify({ ...seen, autoProtect: "weekend" }), sessions);
+  assert.deepEqual(back.revealed, [RACE]);
+  assert.equal(back.autoProtect, "weekend");
+  assert.equal(
+    restorePreferences(JSON.stringify({ ...seen, autoProtect: "x" }), sessions).autoProtect,
+    "off",
+  );
+});
+
+import { duel, teammateOf } from "../src/model.mjs";
+import { parseDriverSeason } from "../src/jolpica.mjs";
+
+test("Duel coéquipiers : course, qualifs, meilleur résultat, points", () => {
+  const drivers = [
+    { id: "driver-a", teamId: "team-x", points: 200 },
+    { id: "driver-b", teamId: "team-x", points: 180 },
+    { id: "driver-c", teamId: "team-x", points: 4 }, // remplaçant ponctuel
+    { id: "driver-d", teamId: "team-y", points: 250 },
+  ];
+  assert.equal(teammateOf(drivers, "driver-a").id, "driver-b");
+  assert.equal(teammateOf(drivers, "driver-b").id, "driver-a");
+  assert.equal(teammateOf(drivers, "inconnu"), undefined);
+  const r = (round, race, quali, points, dnf = false) => ({
+    round,
+    name: `GP${round}`,
+    race,
+    quali,
+    points,
+    dnf,
+  });
+  const d = duel(
+    [r(1, 1, 2, 25), r(2, 15, 1, 0, true), r(3, 3, 3, 15)],
+    [r(1, 2, 1, 18), r(2, 4, 5, 12), r(4, 1, 1, 25)], // GP4 sans moi : ignoré
+  );
+  assert.deepEqual(d.race, [1, 1]); // GP1 devant, GP2 abandon
+  assert.deepEqual(d.quali, [1, 1]);
+  // Meilleur résultat : sur toute la saison de chacun ; un abandon ne compte pas.
+  assert.deepEqual(d.best, [1, 1]);
+  assert.deepEqual(duel([r(1, 9, 9, 2, true)], [r(1, 3, 3, 15)]).best, [Infinity, 3]);
+  assert.equal(d.rounds.length, 2);
+});
+
+test("Saison d'un pilote au format Jolpica, abandon repéré", () => {
+  const races = (key, rows) => ({
+    RaceTable: { Races: rows.map(([round, x]) => ({ round, raceName: `GP${round}`, [key]: [x] })) },
+  });
+  const season = parseDriverSeason(
+    races("Results", [
+      ["1", { position: "3", positionText: "3", points: "15" }],
+      ["2", { position: "18", positionText: "R", points: "0" }],
+    ]),
+    races("QualifyingResults", [
+      ["1", { position: "4" }],
+      ["2", { position: "2" }],
+    ]),
+  );
+  assert.deepEqual(season[0], { round: 1, name: "GP1", race: 3, dnf: false, points: 15, quali: 4 });
+  assert.equal(season[1].dnf, true);
+});
+
+test("Rappels de paris : 1 h avant qualifs, sprint et course, avec un compte", () => {
+  const sessions = [
+    { id: "e:FirstPractice", type: "FirstPractice", startsAt: "2026-05-01T10:00:00Z" },
+    { id: "e:Qualifying", type: "Qualifying", startsAt: "2026-05-02T14:00:00Z" },
+    { id: "e:Race", type: "Race", startsAt: "2026-05-03T13:00:00Z" },
+  ];
+  const now = Date.parse("2026-05-02T13:30:00Z");
+  const prefs = { betReminders: true, account: { token: "t" } };
+  const plan = betReminderPlan(sessions, prefs, now, "GP");
+  assert.deepEqual(
+    plan.map((r) => r.id),
+    ["bet-e:Race"],
+  ); // qualifs : rappel déjà passé
+  assert.equal(plan[0].date, Date.parse("2026-05-03T12:00:00Z"));
+  assert.deepEqual(betReminderPlan(sessions, { ...prefs, account: null }, now), []);
+});
+
+test("Réglages synchronisés : seulement les clés partagées, validées", () => {
+  const sessions = [{ id: "e:Race" }];
+  const local = { ...defaults(), account: { token: "t", id: "u", pseudo: "Q" }, reminders: true };
+  const next = applySynced(
+    local,
+    {
+      myDriver: "driver-x",
+      protectedSessions: ["e:Race", "inconnue"],
+      theme: "dark",
+      reminders: false,
+      account: null,
+    },
+    42,
+    sessions,
+  );
+  assert.equal(next.myDriver, "driver-x");
+  assert.deepEqual(next.protectedSessions, ["e:Race"]);
+  assert.equal(next.theme, "dark");
+  assert.equal(next.reminders, true); // propre au téléphone
+  assert.equal(next.account.pseudo, "Q");
+  assert.equal(next.syncedAt, 42);
+  assert.deepEqual(Object.keys(syncedPart(next)).sort(), [...SYNCED].sort());
+});
+
+test("Duel d'écuries : GP gagnés aux points, podiums, meilleure place", () => {
+  const r = (round, points, best) => ({ round, name: `GP${round}`, points, best });
+  const d = teamDuel(
+    [r(1, 30, 1), r(2, 4, 8), r(3, 10, 5)],
+    [r(1, 12, 4), r(2, 18, 2), r(4, 25, 1)],
+  );
+  assert.deepEqual(d.ahead, [1, 1]); // GP3 absent chez l'autre : ignoré
+  assert.deepEqual(d.podiums, [1, 2]);
+  assert.deepEqual(d.best, [1, 1]);
+  assert.equal(d.rounds.length, 2);
+});
+
+test("Rappel d'avis : après 3 jours, puis au plus une fois par mois", () => {
+  const D = 86400000;
+  assert.equal(askFeedback({ firstSeen: 0, feedbackAt: 0 }, 10 * D), false);
+  assert.equal(askFeedback({ firstSeen: 1, feedbackAt: 0 }, 2 * D), false);
+  assert.equal(askFeedback({ firstSeen: 1, feedbackAt: 0 }, 4 * D), true);
+  assert.equal(askFeedback({ firstSeen: 1, feedbackAt: 4 * D }, 20 * D), false);
+  assert.equal(askFeedback({ firstSeen: 1, feedbackAt: 4 * D }, 40 * D), true);
+});
+
+test("Accueil : la carte « À faire » choisit l'action la plus utile", async () => {
+  const { nextAction } = await import("../src/model.mjs");
+  const H = 3600000;
+  const now = 1000 * H;
+  const bets = (mine, closeIn = 10 * H, openIn = -H) => ({
+    parts: ["quali", "race"],
+    opens: {
+      quali: now + openIn,
+      race: now + 100 * H,
+      fastest: now + 100 * H,
+      dnf: now + 100 * H,
+      answer: now + 100 * H,
+    },
+    closes: {
+      quali: now + closeIn,
+      race: now + 200 * H,
+      fastest: now + 200 * H,
+      dnf: now + 200 * H,
+      answer: now + 200 * H,
+    },
+    mine,
+  });
+  const friend = { key: "friend:u2", text: "Lucas veut être votre ami", link: "/friends" };
+  const forum = { key: "forum:t1", text: "2 réponses à « Pneus »", link: "/forum/t1" };
+  // Pronos qui ferment bientôt : priorité sur la demande d'ami.
+  let a = nextAction({ bets: bets(null), notices: [friend], eventId: "gp", now });
+  assert.equal(a.kind, "bets");
+  assert.equal(a.urgent, true);
+  assert.match(a.title, /top 10 des qualifs/);
+  assert.equal(a.href, "/bet-wizard?event=gp");
+  // Fermeture lointaine : la demande d'ami passe devant.
+  a = nextAction({ bets: bets(null, 100 * H), notices: [friend], eventId: "gp", now });
+  assert.equal(a.kind, "friend");
+  assert.equal(a.href, "/friends");
+  // Pronos prêts : une notification, sinon l'état « prêts ».
+  a = nextAction({ bets: bets({ quali: [] }), notices: [forum], eventId: "gp", now });
+  assert.equal(a.href, "/forum/t1");
+  a = nextAction({ bets: bets({ quali: [] }), notices: [], eventId: "gp", now });
+  assert.equal(a.kind, "ready");
+  // Rien d'ouvert : prochaine ouverture.
+  a = nextAction({ bets: bets(null, 10 * H, 5 * H), notices: [], eventId: "gp", now });
+  assert.equal(a.kind, "soon");
+  assert.equal(a.opensAt, now + 5 * H);
+  assert.equal(nextAction({ bets: null, notices: [], eventId: "gp", now }), null);
 });

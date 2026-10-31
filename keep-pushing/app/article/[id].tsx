@@ -5,7 +5,7 @@ import { useStore } from "../../src/store";
 import { Button, Screen, SourceBadge, formatDate, useTheme } from "../../src/ui";
 
 export default function Article() {
-  const { s } = useTheme();
+  const { s, c } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { prefs, season } = useStore();
   const router = useRouter();
@@ -21,8 +21,17 @@ export default function Article() {
       />
       {readable ? (
         <>
-          <SourceBadge kind={article.kind} lang={article.lang} />
+          <SourceBadge
+            kind={article.kind}
+            lang={article.lang}
+            translated={!!article.translatedFrom}
+          />
           <Text style={s.title}>{article.title}</Text>
+          {!!article.originalTitle && (
+            <Text style={s.small}>
+              Traduction automatique. Titre original : « {article.originalTitle} »
+            </Text>
+          )}
           <View style={s.card}>
             <Text style={s.text}>
               {article.summary || "Pas de résumé fourni par la source : lisez l’article d’origine."}
@@ -34,7 +43,7 @@ export default function Article() {
             </Text>
           </View>
           {article.kind === "unofficial" && (
-            <View style={[s.lock, { backgroundColor: "#fbeedd" }]}>
+            <View style={[s.lock, { backgroundColor: c.warn }]}>
               <Text style={s.text}>
                 Source non officielle : information à vérifier, elle peut être inexacte ou
                 relever de la rumeur.

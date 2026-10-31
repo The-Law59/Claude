@@ -25,7 +25,108 @@ Le script installe Docker, télécharge le projet dans `/opt/keep-pushing`,
 construit l'app (quelques minutes la première fois) et affiche son adresse,
 par exemple `http://192.168.1.50:3000`. Relancer la même commande met l'app à jour.
 
-## 3. Sur le téléphone
+## 3. Traduction des actualités anglaises (facultatif)
+
+Les articles en anglais (Formula1.com, FIA, Reddit) sont traduits en français
+par l'API Claude si une clé est fournie. Sans clé, ils restent en anglais.
+
+1. Créer une clé sur https://console.anthropic.com (Settings → API Keys) et,
+   par prudence, fixer une limite de dépense mensuelle (Settings → Limits).
+2. Dans la console du conteneur :
+   ```bash
+   echo 'ANTHROPIC_API_KEY=sk-ant-...' > /opt/keep-pushing/keep-pushing/.env
+   chmod 600 /opt/keep-pushing/keep-pushing/.env
+   ```
+   (remplacer `sk-ant-...` par votre clé ; ne la partagez jamais ailleurs).
+3. Relancer la commande d'installation pour redémarrer l'app.
+
+Admins (lecture des avis, modération du forum) : ajoutez leurs pseudos dans
+le même fichier `.env`, séparés par des virgules, puis relancez l'installation :
+```bash
+echo 'ADMINS=Quentin' >> /opt/keep-pushing/keep-pushing/.env
+```
+
+Chaque article n'est traduit qu'une fois (cache conservé entre les mises à jour).
+
+Le même volume Docker garde aussi les **comptes, amis et paris**
+(`/app/data/game.json`). Pour une sauvegarde :
+```bash
+docker compose -f /opt/keep-pushing/keep-pushing/docker-compose.yml cp keep-pushing:/app/data ./sauvegarde-keep-pushing
+```
+
+Météo : les téléphones interrogent directement Open-Meteo (gratuit, sans clé,
+pour un usage non commercial ; une version payante est nécessaire si l'app
+devient commerciale).
+
+Sauvegardes : le serveur copie chaque jour `game.json` dans
+`/app/data/backups/` (14 jours gardés). Pour se protéger aussi d'une panne du
+conteneur, activez une sauvegarde planifiée du LXC dans Proxmox
+(Datacenter → Sauvegarde → Ajouter). Pour restaurer une copie :
+```bash
+cd /opt/keep-pushing/keep-pushing
+docker compose stop
+docker compose run --rm keep-pushing cp data/backups/game-AAAA-MM-JJ.json data/game.json
+docker compose start
+```
+
+## Surveillance
+
+- `curl http://<IP du conteneur>:3000/api/health` : état du serveur (saison,
+  actus, sauvegarde, version, durée de fonctionnement). `docker ps` affiche
+  aussi `healthy` / `unhealthy`.
+- Les plantages de l'appli et du serveur arrivent dans Réglages → Tableau de
+  bord admin (et une notification aux admins à chaque nouvelle erreur).
+- Être prévenu si le serveur tombe : lancez Uptime Kuma, fourni dans le
+  même fichier, puis ouvrez `http://<IP du conteneur>:3001` :
+  ```bash
+  cd /opt/keep-pushing/keep-pushing && docker compose --profile monitoring up -d
+  ```
+  Ajoutez une sonde « HTTP(s) » sur `http://keep-pushing:3000/api/health`
+  (toutes les minutes) et une notification (Telegram, e-mail, Discord…).
+  Pour surveiller aussi le conteneur Proxmox lui-même, installez plutôt Uptime
+  Kuma sur une autre machine (ou un service gratuit comme UptimeRobot si le
+  serveur est accessible depuis Internet).
+
+Mot de passe oublié par un joueur : depuis le tableau de bord admin (Joueurs →
+« Nouveau mot de passe »), ou en console : l'app s'arrête une minute, le temps de
+lui en générer un nouveau (affiché à l'écran, à lui transmettre) :
+```bash
+cd /opt/keep-pushing/keep-pushing
+docker compose stop
+docker compose run --rm keep-pushing node scripts/reset-password.mjs <pseudo>
+docker compose start
+```
+
+Prono oublié : le plus simple est le tableau de bord admin (Pronos par
+joueur → « Saisir »). En console, un joueur qui a donné sa liste à un admin
+avant la fermeture peut aussi être enregistré à sa place (noms de famille, accents facultatifs ;
+GP = numéro de manche ; partie = quali, sprint ou race) :
+```bash
+cd /opt/keep-pushing/keep-pushing
+docker compose stop
+docker compose run --rm keep-pushing node scripts/add-bet.mjs <pseudo> 19 quali "Antonelli,Russell,Leclerc,Hamilton,Norris,Piastri,Verstappen,Hadjar,Hulkenberg,Hirakawa"
+docker compose start
+```
+
+## Essais libres (fournisseur à choisir)
+
+Jolpica ne publie pas les essais libres ni la qualif sprint. Le serveur a un
+connecteur prêt (`src/practice.mjs`) : il suffit d'ajouter l'adaptateur du
+fournisseur retenu (Hyprace en premier choix, licence commerciale) dans
+`PROVIDERS`, puis dans `.env` :
+```
+PRACTICE_PROVIDER=hyprace
+PRACTICE_API_KEY=…
+```
+et `docker compose up -d`. Sans fournisseur, l'appli affiche « Résultats des
+essais pas encore disponibles ». OpenF1 est exclu : usage non commercial.
+
+## Pubs pour regagner le joker (après la sortie sur les stores)
+
+Prêt côté serveur, désactivé par défaut. Mode d'emploi complet :
+`docs/pubs-joker.md`. Activation : `ADS_ENABLED=1` dans `.env`.
+
+## 4. Sur le téléphone
 
 1. Même Wi-Fi que le serveur : ouvrir `http://<IP du conteneur>:3000`.
 2. Ajouter à l'écran d'accueil :

@@ -13,13 +13,39 @@ const at = (x) => `${x.date}T${x.time ?? "00:00:00Z"}`;
 const eventId = (race) => `f1-${race.season}-${race.round}`;
 const person = (d) => `${d.givenName} ${d.familyName}`;
 
+// Pilotes remplaçants annoncés mais pas encore dans les classements Jolpica
+// (un pilote n'y apparaît qu'après sa première course). Ajoutés à la saison
+// pour pouvoir être pariés ; le titulaire reste listé, au cas où le
+// remplacement ne dure qu'un week-end. Par année de saison.
+export const ROSTER_ADDITIONS = {
+  2026: [{ driverId: "hirakawa", givenName: "Ryo", familyName: "Hirakawa", constructorId: "haas" }],
+};
+const additionsOf = (season) => ROSTER_ADDITIONS[season] ?? [];
+// Même pilote si Jolpica lui donne un autre identifiant : on garde le nôtre,
+// pour que paris et résultats parlent du même pilote.
+const plainName = (t) =>
+  t
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+function driverKey(driver, season) {
+  const added = additionsOf(season).find(
+    (a) => plainName(a.familyName) === plainName(driver.familyName ?? ""),
+  );
+  return `driver-${added?.driverId ?? driver.driverId}`;
+}
+
 function rows(race, pick) {
   return (race?.Results ?? race?.SprintResults ?? race?.QualifyingResults ?? []).map((x) => ({
     position: Number(x.position),
-    driverId: `driver-${x.Driver.driverId}`,
+    driverId: driverKey(x.Driver, race?.season),
     name: person(x.Driver),
     team: x.Constructor.name,
     value: pick(x),
+    // Pour les paris : non classés (R, D…) et meilleur tour.
+    ...(x.positionText && { positionText: x.positionText }),
+    ...(x.FastestLap?.rank === "1" && { fastestLap: true }),
+    ...(x.grid !== undefined && { grid: Number(x.grid) }),
   }));
 }
 const raceTime = (x) => x.Time?.time ?? x.status;
@@ -45,23 +71,35 @@ export function parseSeason({ schedule, winners, drivers, teams }) {
       round: Number(race.round),
       name: race.raceName,
       circuit: race.Circuit.circuitName,
+      circuitId: race.Circuit.circuitId,
+      location: race.Circuit.Location && {
+        lat: Number(race.Circuit.Location.lat),
+        long: Number(race.Circuit.Location.long),
+        locality: race.Circuit.Location.locality,
+        country: race.Circuit.Location.country,
+      },
       winner: winnerOf[id] ?? null,
       sessions,
     };
   });
   const standings = (data, key) => data.StandingsTable.StandingsLists[0]?.[key] ?? [];
+  const year = schedule.RaceTable.season ?? schedule.RaceTable.Races[0]?.season;
   return {
     mode: "live",
     events,
     // Rempli Grand Prix par Grand Prix avec loadRound().
     results: {},
-    drivers: standings(drivers, "DriverStandings").map((d) => ({
-      id: `driver-${d.Driver.driverId}`,
-      name: person(d.Driver),
-      team: d.Constructors.at(-1)?.name ?? "",
-      teamId: `team-${d.Constructors.at(-1)?.constructorId}`,
-      points: Number(d.points),
-    })),
+    drivers: withAdditions(
+      standings(drivers, "DriverStandings").map((d) => ({
+        id: driverKey(d.Driver, year),
+        name: person(d.Driver),
+        team: d.Constructors.at(-1)?.name ?? "",
+        teamId: `team-${d.Constructors.at(-1)?.constructorId}`,
+        points: Number(d.points),
+      })),
+      standings(teams, "ConstructorStandings"),
+      year,
+    ),
     teams: standings(teams, "ConstructorStandings").map((t) => ({
       id: `team-${t.Constructor.constructorId}`,
       name: t.Constructor.name,
@@ -101,6 +139,21 @@ const getJson = async (fetchFn, path) => {
   return (await res.json()).MRData;
 };
 
+// Ajoute les remplaçants absents des classements, en fin de liste, à 0 point.
+function withAdditions(list, teams, season) {
+  const extra = additionsOf(season)
+    .filter((a) => !list.some((d) => d.id === `driver-${a.driverId}`))
+    .map((a) => ({
+      id: `driver-${a.driverId}`,
+      name: `${a.givenName} ${a.familyName}`,
+      team:
+        teams.find((t) => t.Constructor.constructorId === a.constructorId)?.Constructor.name ?? "",
+      teamId: `team-${a.constructorId}`,
+      points: 0,
+    }));
+  return [...list, ...extra];
+}
+
 export async function loadSeason(fetchFn = fetch) {
   // 4 requêtes au démarrage : Jolpica limite les rafales (4 req/s).
   const [schedule, winners, drivers, teams] = await Promise.all(
@@ -126,4 +179,81 @@ export async function loadRound(event, fetchFn = fetch) {
     hasSprint ? getJson(fetchFn, `${base}/sprint.json?limit=100`) : null,
   ]);
   return parseRound(event, { race, qualifying, sprint });
+}
+
+// Saison d'un pilote, GP par GP : place en course (dnf si non classé) et en qualifs.
+export function parseDriverSeason(results, qualifying) {
+  const rounds = {};
+  for (const r of results.RaceTable.Races) {
+    const x = r.Results[0];
+    rounds[r.round] = {
+      round: Number(r.round),
+      name: r.raceName,
+      race: Number(x.position),
+      dnf: !/^\d+$/.test(x.positionText),
+      points: Number(x.points),
+    };
+  }
+  for (const q of qualifying.RaceTable.Races) {
+    rounds[q.round] ??= { round: Number(q.round), name: q.raceName };
+    rounds[q.round].quali = Number(q.QualifyingResults[0].position);
+  }
+  return Object.values(rounds).sort((a, b) => a.round - b.round);
+}
+
+export async function loadDriverSeason(driverId, fetchFn = fetch) {
+  const id = driverId.replace(/^driver-/, "");
+  const [results, qualifying] = await Promise.all(
+    ["results", "qualifying"].map((kind) =>
+      getJson(fetchFn, `/current/drivers/${id}/${kind}.json?limit=100`),
+    ),
+  );
+  return parseDriverSeason(results, qualifying);
+}
+
+// Saison d'une écurie, GP par GP : points (course + sprint) et meilleure place.
+export function parseTeamSeason(results, sprints) {
+  const rounds = {};
+  const add = (races, key) => {
+    for (const r of races.RaceTable.Races) {
+      const x = (rounds[r.round] ??= {
+        round: Number(r.round),
+        name: r.raceName,
+        points: 0,
+        best: null,
+      });
+      for (const row of r[key]) {
+        x.points += Number(row.points);
+        if (key === "Results") x.best = Math.min(x.best ?? 99, Number(row.position));
+      }
+    }
+  };
+  add(results, "Results");
+  add(sprints, "SprintResults");
+  return Object.values(rounds).sort((a, b) => a.round - b.round);
+}
+
+export async function loadTeamSeason(teamId, fetchFn = fetch) {
+  const id = teamId.replace(/^team-/, "");
+  const [results, sprints] = await Promise.all(
+    ["results", "sprint"].map((kind) =>
+      getJson(fetchFn, `/current/constructors/${id}/${kind}.json?limit=100`),
+    ),
+  );
+  return parseTeamSeason(results, sprints);
+}
+
+// Vainqueurs passés d'un circuit, du plus récent au plus ancien.
+export function parseCircuitHistory(data) {
+  return data.RaceTable.Races.map((r) => ({
+    season: r.season,
+    driver: person(r.Results[0].Driver),
+    team: r.Results[0].Constructor.name,
+  })).reverse();
+}
+
+export async function loadCircuitHistory(circuitId, fetchFn = fetch) {
+  return parseCircuitHistory(
+    await getJson(fetchFn, `/circuits/${circuitId}/results/1.json?limit=100`),
+  );
 }

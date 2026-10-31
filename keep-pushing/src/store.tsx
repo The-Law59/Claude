@@ -3,7 +3,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { demoSeason } from "./data.mjs";
 import { loadRound, loadSeason } from "./jolpica.mjs";
 import { loadNews, toArticle } from "./news.mjs";
-import { defaults, focusEvents, restorePreferences } from "./model.mjs";
+import { api, hasApi } from "./api.mjs";
+import { notifyNow } from "./reminders";
+import {
+  applySynced,
+  autoProtect,
+  defaults,
+  focusEvents,
+  restorePreferences,
+  syncedPart,
+} from "./model.mjs";
 
 const KEY = "keep-pushing.preferences.v1";
 export type Prefs = {
@@ -12,6 +21,16 @@ export type Prefs = {
   myDriver: string;
   myTeam: string;
   protectedSessions: string[];
+  revealed: string[];
+  autoProtect: "off" | "race" | "weekend";
+  account: { token: string; id: string; pseudo: string } | null;
+  welcomed: boolean;
+  syncedAt: number;
+  betReminders: boolean;
+  theme: "auto" | "light" | "dark";
+  firstSeen: number;
+  feedbackAt: number;
+  recapClosed: string;
   frequency: string;
   rumors: boolean;
   reminders: boolean;
@@ -19,7 +38,7 @@ export type Prefs = {
   results: boolean;
 };
 export type Session = { id: string; type: string; label: string; startsAt: string };
-type Row = { position: number; driverId: string; name: string; team: string; value: string };
+export type Row = { position: number; driverId: string; name: string; team: string; value: string };
 export type Event = {
   id: string;
   competition: string;
@@ -27,6 +46,8 @@ export type Event = {
   round: number;
   name: string;
   circuit: string;
+  circuitId?: string;
+  location?: { lat: number; long: number; locality: string; country: string };
   winner: Row | null;
   sessions: Session[];
 };
@@ -46,6 +67,8 @@ export type Article = (typeof demoSeason.articles)[number] & {
   lang?: string;
   publishedAt?: number;
   dated?: boolean;
+  translatedFrom?: string;
+  originalTitle?: string;
 };
 type Store = {
   prefs: Prefs;
@@ -56,7 +79,25 @@ type Store = {
   loadResults: (event: Event) => void;
   ready: boolean;
   error: string;
+  inbox: Inbox;
+  markRead: (link?: string) => void;
 };
+export type Notice = {
+  id: string;
+  key: string;
+  text: string;
+  link: string;
+  eventId: string | null;
+  count: number;
+  at: number;
+  read: boolean;
+};
+type Inbox = { unread: number; items: Notice[] };
+// Texte d'une notification, neutre si elle touche un GP protégé (anti-spoil).
+export const noticeText = (n: Notice, prefs: Prefs) =>
+  n.eventId && prefs.protectedSessions.some((id) => id.startsWith(`${n.eventId}:`))
+    ? "Nouvelle réponse dans un sujet masqué (anti-spoil)"
+    : n.text;
 const Ctx = createContext<Store | null>(null);
 export const useStore = () => useContext(Ctx)!;
 
@@ -89,10 +130,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     ]).then(([raw, loaded, news]) => {
       if (!alive) return;
       // Sans flux : articles fictifs en démo, aucun en mode réel.
-      if (news) loaded = { ...loaded, articles: news.map((n) => toArticle(n, loaded)) };
+      if (news)
+        loaded = {
+          ...loaded,
+          articles: news.map((n: Parameters<typeof toArticle>[0]) => toArticle(n, loaded)),
+        };
       setSeason(loaded);
       if (raw)
-        setPrefs(restorePreferences(raw, loaded.events.flatMap((e) => e.sessions)));
+        setPrefs(
+          restorePreferences(
+            raw,
+            loaded.events.flatMap((e) => e.sessions),
+          ),
+        );
       setReady(true);
     });
     return () => {
@@ -106,10 +156,91 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       .then(() => AsyncStorage.setItem(KEY, JSON.stringify(prefs)))
       .catch(() => setError("Vos choix n’ont pas pu être enregistrés."));
   }, [prefs, ready]);
+  useEffect(() => {
+    if (ready && !prefs.firstSeen) setPrefs((p) => ({ ...p, firstSeen: Date.now() }));
+  }, [ready]);
+  // Anti-spoil automatique : au démarrage puis chaque minute.
+  useEffect(() => {
+    if (!ready) return;
+    const tick = () => setPrefs((p) => autoProtect(p, season.events) as Prefs);
+    tick();
+    const timer = setInterval(tick, 60000);
+    return () => clearInterval(timer);
+  }, [ready, season.events]);
+  // Réglages du compte : lus au démarrage, à la connexion puis toutes les
+  // 5 min ; envoyés 1,5 s après un changement sur cet appareil.
+  const token = prefs.account?.token;
+  const [pulledFor, setPulledFor] = useState<string | null>(null);
+  const pushed = useRef("");
+  useEffect(() => {
+    if (!ready || !token || !hasApi()) return;
+    const sessions = season.events.flatMap((e) => e.sessions);
+    const pull = () =>
+      api("/api/settings", { token })
+        .then(({ data, at }) => {
+          if (data)
+            setPrefs((p) => {
+              if (at <= p.syncedAt) return p;
+              const next = applySynced(p, data, at, sessions) as Prefs;
+              pushed.current = JSON.stringify(syncedPart(next));
+              return next;
+            });
+          setPulledFor(token);
+        })
+        .catch(() => {});
+    pull();
+    const timer = setInterval(pull, 5 * 60000);
+    return () => clearInterval(timer);
+  }, [ready, token]);
+  const part = JSON.stringify(syncedPart(prefs));
+  useEffect(() => {
+    if (!ready || !token || pulledFor !== token || part === pushed.current) return;
+    const timer = setTimeout(() => {
+      api("/api/settings", { method: "PUT", body: { data: JSON.parse(part) }, token })
+        .then(({ at }) => {
+          pushed.current = part;
+          setPrefs((p) => ({ ...p, syncedAt: at }));
+        })
+        .catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [part, ready, token, pulledFor]);
+  // Notifications : relevées à l'ouverture puis chaque minute ; une alerte
+  // du téléphone quand il y a du nouveau (appli ouverte ou en arrière-plan).
+  const [inbox, setInbox] = useState<Inbox>({ unread: 0, items: [] });
+  const seen = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !token || !hasApi()) return setInbox({ unread: 0, items: [] });
+    const poll = () =>
+      api("/api/notifications", { token })
+        .then((box: Inbox) => {
+          setInbox(box);
+          const latest = box.items.find((n) => !n.read);
+          const stamp = latest && `${latest.id}:${latest.count}`;
+          if (latest && seen.current !== null && stamp !== seen.current)
+            notifyNow("Keep Pushing", noticeText(latest, prefsRef.current));
+          seen.current = stamp ?? "";
+        })
+        .catch(() => {});
+    poll();
+    const timer = setInterval(poll, 60000);
+    return () => clearInterval(timer);
+  }, [ready, token]);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+  // Marque comme lues les notifications d'un lien (sujet, ligue), ou toutes.
+  const markRead = (link?: string) => {
+    if (!token || !hasApi()) return;
+    api("/api/notifications", { method: "POST", body: { link }, token })
+      .then(setInbox)
+      .catch(() => {});
+  };
   const focus = useMemo(() => focusEvents(season.events) as Store["focus"], [season]);
   const update = (patch: Partial<Prefs>) => setPrefs((p) => ({ ...p, ...patch }));
   return (
-    <Ctx.Provider value={{ prefs, setPrefs, update, season, focus, loadResults, ready, error }}>
+    <Ctx.Provider
+      value={{ prefs, setPrefs, update, season, focus, loadResults, ready, error, inbox, markRead }}
+    >
       {children}
     </Ctx.Provider>
   );
