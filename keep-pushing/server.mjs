@@ -88,8 +88,9 @@ const refreshSeason = () =>
 await refreshSeason();
 setInterval(refreshSeason, 60 * 60 * 1000);
 
-// Résultats d'un week-end : gardés pour de bon une fois la course publiée,
-// sinon redemandés au plus toutes les 10 min. Une requête Jolpica à la fois
+// Résultats d'un week-end : gardés pour de bon une fois définitifs (course
+// publiée depuis 3 jours, pénalités d'après-course comprises), sinon
+// redemandés au plus toutes les 10 min. Une requête Jolpica à la fois
 // (l'API limite les rafales).
 const rounds = new Map();
 const inflight = new Map();
@@ -106,7 +107,7 @@ async function roundResults(event) {
         rounds.set(event.id, {
           results,
           at: Date.now(),
-          final: !!results[`${event.id}:Race`]?.length,
+          final: bets.resultsSettled(event, results),
         });
         return results;
       })

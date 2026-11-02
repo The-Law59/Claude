@@ -152,10 +152,12 @@ export const dnfCount = (rows) =>
 // qualifs (points provisoires). Départ des stands (grille 0) en fin de grille.
 export function qualiReference(results) {
   const race = results.Race;
-  if (!race?.length || !race.some((r) => r.grid > 0)) return { rows: results.Qualifying, grid: false };
+  if (!race?.length || !race.some((r) => r.grid > 0))
+    return { rows: results.Qualifying, grid: false };
   const quali = Object.fromEntries((results.Qualifying ?? []).map((r) => [r.driverId, r.position]));
   const order = [...race].sort(
-    (a, b) => (a.grid || 99) - (b.grid || 99) || (quali[a.driverId] ?? 99) - (quali[b.driverId] ?? 99),
+    (a, b) =>
+      (a.grid || 99) - (b.grid || 99) || (quali[a.driverId] ?? 99) - (quali[b.driverId] ?? 99),
   );
   return { rows: order.map((r, i) => ({ driverId: r.driverId, position: i + 1 })), grid: true };
 }
@@ -246,4 +248,17 @@ export function history(userIds, rounds, order, me) {
         rank: 1 + Object.values(totals).filter((t) => t > totals[me]).length,
       };
     });
+}
+
+// Résultats définitifs : course publiée et 3 jours écoulés depuis le départ.
+// Avant, les pénalités d'après-course (et leurs corrections chez Jolpica)
+// peuvent encore changer le classement : on le relit régulièrement.
+export const SETTLE_DAYS = 3;
+export function resultsSettled(event, results, now = Date.now()) {
+  const race = event.sessions.find((s) => s.type === "Race");
+  return (
+    !!results?.[`${event.id}:Race`]?.length &&
+    !!race &&
+    now - Date.parse(race.startsAt) > SETTLE_DAYS * 86400000
+  );
 }

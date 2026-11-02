@@ -2,11 +2,39 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as accounts from "../src/accounts.mjs";
 import {
-  mergeBet, scoreBet, scoreList, visibleBet, leaderboard, partsOf, perRound, history,
-  questionOf, answerOf, closesAt, opensAt, mondayAfter, qualiReference, POINTS,
+  mergeBet,
+  scoreBet,
+  scoreList,
+  visibleBet,
+  leaderboard,
+  partsOf,
+  perRound,
+  history,
+  questionOf,
+  answerOf,
+  closesAt,
+  opensAt,
+  mondayAfter,
+  qualiReference,
+  POINTS,
 } from "../src/bets.mjs";
-import { createLeague, joinLeague, leaveLeague, leaguesOf, postMessage, deleteMessage, messagesOf } from "../src/leagues.mjs";
-import { championsCloseAt, mergeChampions, scoreChampions, standingsBySeason, backupName, backupsToDelete } from "../src/seasons.mjs";
+import {
+  createLeague,
+  joinLeague,
+  leaveLeague,
+  leaguesOf,
+  postMessage,
+  deleteMessage,
+  messagesOf,
+} from "../src/leagues.mjs";
+import {
+  championsCloseAt,
+  mergeChampions,
+  scoreChampions,
+  standingsBySeason,
+  backupName,
+  backupsToDelete,
+} from "../src/seasons.mjs";
 
 const fresh = () => ({ users: {}, sessions: {}, bets: {} });
 const rejects = (p, status) => assert.rejects(p, (e) => e.status === status);
@@ -14,7 +42,10 @@ const throws = (fn, status) => assert.throws(fn, (e) => e.status === status);
 
 test("Inscription, connexion, session et déconnexion", async () => {
   const state = fresh();
-  const { token, user } = await accounts.register(state, { pseudo: "Quentin", password: "monsecret1" });
+  const { token, user } = await accounts.register(state, {
+    pseudo: "Quentin",
+    password: "monsecret1",
+  });
   assert.equal(user.pseudo, "Quentin");
   assert.ok(!JSON.stringify(state).includes("monsecret1"));
   assert.ok(!JSON.stringify(state).includes(token)); // jeton stocké haché
@@ -24,8 +55,15 @@ test("Inscription, connexion, session et déconnexion", async () => {
   await rejects(accounts.register(state, { pseudo: "Léa", password: "court" }), 400);
 
   const failures = new Map();
-  await rejects(accounts.login(state, { pseudo: "QUENTIN", password: "mauvais!!" }, { failures }), 401);
-  const again = await accounts.login(state, { pseudo: "QUENTIN", password: "monsecret1" }, { failures });
+  await rejects(
+    accounts.login(state, { pseudo: "QUENTIN", password: "mauvais!!" }, { failures }),
+    401,
+  );
+  const again = await accounts.login(
+    state,
+    { pseudo: "QUENTIN", password: "monsecret1" },
+    { failures },
+  );
   assert.equal(again.user.id, user.id);
   accounts.logout(state, `Bearer ${token}`);
   throws(() => accounts.authenticate(state, `Bearer ${token}`), 401);
@@ -37,10 +75,20 @@ test("Connexion bloquée après trop d'essais", async () => {
   await accounts.register(state, { pseudo: "Quentin", password: "monsecret1" });
   const failures = new Map();
   for (let i = 0; i < 8; i++)
-    await rejects(accounts.login(state, { pseudo: "Quentin", password: "nonnonnon" }, { failures }), 401);
-  await rejects(accounts.login(state, { pseudo: "Quentin", password: "monsecret1" }, { failures }), 429);
+    await rejects(
+      accounts.login(state, { pseudo: "Quentin", password: "nonnonnon" }, { failures }),
+      401,
+    );
+  await rejects(
+    accounts.login(state, { pseudo: "Quentin", password: "monsecret1" }, { failures }),
+    429,
+  );
   const later = Date.now() + 16 * 60 * 1000;
-  await accounts.login(state, { pseudo: "Quentin", password: "monsecret1" }, { failures, now: later });
+  await accounts.login(
+    state,
+    { pseudo: "Quentin", password: "monsecret1" },
+    { failures, now: later },
+  );
 });
 
 test("Mot de passe réinitialisé : anciennes sessions fermées", async () => {
@@ -48,24 +96,46 @@ test("Mot de passe réinitialisé : anciennes sessions fermées", async () => {
   const { token } = await accounts.register(state, { pseudo: "Quentin", password: "monsecret1" });
   await accounts.resetPassword(state, "quentin", "nouveau123");
   throws(() => accounts.authenticate(state, `Bearer ${token}`), 401);
-  await accounts.login(state, { pseudo: "Quentin", password: "nouveau123" }, { failures: new Map() });
+  await accounts.login(
+    state,
+    { pseudo: "Quentin", password: "nouveau123" },
+    { failures: new Map() },
+  );
 });
 
 test("Amis : demande, acceptation, retrait", async () => {
   const state = fresh();
-  const reg = async (pseudo) => accounts.authenticate(state, `Bearer ${(await accounts.register(state, { pseudo, password: "motdepasse" })).token}`);
+  const reg = async (pseudo) =>
+    accounts.authenticate(
+      state,
+      `Bearer ${(await accounts.register(state, { pseudo, password: "motdepasse" })).token}`,
+    );
   const [a, b] = [await reg("Quentin"), await reg("Lucas")];
   accounts.addFriend(state, a, "lucas");
-  assert.deepEqual(accounts.friendsView(state, a).outgoing.map((u) => u.pseudo), ["Lucas"]);
-  assert.deepEqual(accounts.friendsView(state, b).incoming.map((u) => u.pseudo), ["Quentin"]);
+  assert.deepEqual(
+    accounts.friendsView(state, a).outgoing.map((u) => u.pseudo),
+    ["Lucas"],
+  );
+  assert.deepEqual(
+    accounts.friendsView(state, b).incoming.map((u) => u.pseudo),
+    ["Quentin"],
+  );
   assert.deepEqual(accounts.friendIds(state, a), []);
   accounts.addFriend(state, b, "Quentin"); // accepte
-  assert.deepEqual(accounts.friendsView(state, a).friends.map((u) => u.pseudo), ["Lucas"]);
+  assert.deepEqual(
+    accounts.friendsView(state, a).friends.map((u) => u.pseudo),
+    ["Lucas"],
+  );
   assert.deepEqual(accounts.friendIds(state, b), [a.id]);
   throws(() => accounts.addFriend(state, a, "Quentin"), 400);
   throws(() => accounts.addFriend(state, a, "Personne"), 404);
   accounts.removeFriend(state, a, b.id);
-  assert.deepEqual(accounts.friendsView(state, b), { me: { id: b.id, pseudo: "Lucas" }, friends: [], outgoing: [], incoming: [] });
+  assert.deepEqual(accounts.friendsView(state, b), {
+    me: { id: b.id, pseudo: "Lucas" },
+    friends: [],
+    outgoing: [],
+    incoming: [],
+  });
 });
 
 const H = 3600000;
@@ -87,11 +157,23 @@ const top = (n) => ids.slice(0, n);
 test("Paris : parties du week-end, ouverture et fermeture de chaque partie", () => {
   assert.deepEqual(partsOf(sprintWeekend), ["quali", "sprint", "race"]);
   // Avant les qualifs : course, meilleur tour et abandons pas encore ouverts.
-  const before = mergeBet(sprintWeekend, undefined, { quali: top(10), sprint: top(8), race: top(10), fastest: "d1", dnf: 2 }, ids, T - H);
+  const before = mergeBet(
+    sprintWeekend,
+    undefined,
+    { quali: top(10), sprint: top(8), race: top(10), fastest: "d1", dnf: 2 },
+    ids,
+    T - H,
+  );
   assert.deepEqual(before.sprint, top(8));
   assert.deepEqual([before.race, before.fastest, before.dnf], [undefined, undefined, undefined]);
   // 1 h après le début des qualifs : qualifs et sprint figés, course ouverte.
-  const after = mergeBet(sprintWeekend, before, { sprint: ids.slice(1, 9), quali: ids.slice(1, 11), race: top(10), dnf: 3 }, ids, T + 5 * H);
+  const after = mergeBet(
+    sprintWeekend,
+    before,
+    { sprint: ids.slice(1, 9), quali: ids.slice(1, 11), race: top(10), dnf: 3 },
+    ids,
+    T + 5 * H,
+  );
   assert.deepEqual(after.sprint, top(8));
   assert.deepEqual(after.quali, top(10));
   assert.deepEqual(after.race, top(10));
@@ -101,7 +183,10 @@ test("Paris : parties du week-end, ouverture et fermeture de chaque partie", () 
   throws(() => mergeBet(sprintWeekend, {}, { race: top(9) }, ids, later), 400); // incomplet
   throws(() => mergeBet(sprintWeekend, {}, { fastest: "inconnu" }, ids, later), 400);
   // Les autres ne voient que les parties fermées.
-  assert.deepEqual(Object.keys(visibleBet(sprintWeekend, after, T + 5 * H)).sort(), ["quali", "sprint"]);
+  assert.deepEqual(Object.keys(visibleBet(sprintWeekend, after, T + 5 * H)).sort(), [
+    "quali",
+    "sprint",
+  ]);
   assert.equal(answerOf("pole", []), null);
 });
 
@@ -123,7 +208,11 @@ test("Ouverture des qualifs le lundi qui suit le GP précédent", () => {
 
 test("Barème du tableau : exact, à une place près, dans le top, bonus parfait", () => {
   const rows = ids.map((driverId, i) => ({ driverId, position: i + 1 }));
-  assert.deepEqual(scoreList(top(10), rows, 10), { slots: Array(10).fill(10), bonus: POINTS.perfect, total: 120 });
+  assert.deepEqual(scoreList(top(10), rows, 10), {
+    slots: Array(10).fill(10),
+    bonus: POINTS.perfect,
+    total: 120,
+  });
   // d2 et d1 inversés (5+5), d12 en 3e alors qu'il finit 12e (0), d4 en 10e (2)
   const pick = ["d2", "d1", "d12", "d5", "d6", "d7", "d8", "d9", "d10", "d4"];
   const s = scoreList(pick, rows, 10);
@@ -146,23 +235,44 @@ test("Meilleur tour, abandons et total ; résultats absents = null", () => {
   assert.equal(s.quali, null);
   assert.equal(s.total, 120 + POINTS.fastest + POINTS.dnfClose);
   assert.deepEqual(scoreBet(bet, {}), {
-    total: 0, quali: null, sprint: null, race: null, fastest: null, dnf: null, answer: null, joker: false,
+    total: 0,
+    quali: null,
+    sprint: null,
+    race: null,
+    fastest: null,
+    dnf: null,
+    answer: null,
+    joker: false,
   });
   // Joker : tout le week-end compte double.
   assert.equal(scoreBet({ ...bet, joker: true }, { Race: race }).total, s.total * 2);
 
-  const rounds = perRound({ e1: { u1: bet }, e2: { u1: bet } }, (id) => (id === "e1" ? { Race: race } : undefined));
+  const rounds = perRound({ e1: { u1: bet }, e2: { u1: bet } }, (id) =>
+    id === "e1" ? { Race: race } : undefined,
+  );
   assert.deepEqual(rounds, { e1: { u1: s.total } });
   assert.deepEqual(leaderboard(["u1", "u2"], rounds), [
     { id: "u1", points: s.total, weekends: 1 },
     { id: "u2", points: 0, weekends: 0 },
-  ]);});
+  ]);
+});
 
 test("Question du week-end : choisie par manche, réponse tirée des résultats", () => {
   assert.equal(questionOf({ round: 0 }).id, "pole");
   assert.notEqual(questionOf({ round: 1 }).id, questionOf({ round: 2 }).id);
-  const row = (driverId, position, grid, team, value = "1:30:00") => ({ driverId, position, grid, team, value });
-  const race = [row("a", 1, 3, "McLaren"), row("b", 2, 12, "Ferrari", "+4.512"), row("c", 3, 1, "Mercedes", "+1:02.000"), row("d", 4, 0, "Haas")];
+  const row = (driverId, position, grid, team, value = "1:30:00") => ({
+    driverId,
+    position,
+    grid,
+    team,
+    value,
+  });
+  const race = [
+    row("a", 1, 3, "McLaren"),
+    row("b", 2, 12, "Ferrari", "+4.512"),
+    row("c", 3, 1, "Mercedes", "+1:02.000"),
+    row("d", 4, 0, "Haas"),
+  ];
   assert.equal(answerOf("pole", race), false);
   assert.equal(answerOf("comeback", race), true);
   assert.equal(answerOf("gap", race), false);
@@ -213,7 +323,10 @@ test("Ligues privées : création, code, adhésion, départ", () => {
 });
 
 test("Chat de ligue : membres seulement, rythme limité, modération", () => {
-  const state = { leagues: {}, users: { a: { pseudo: "Quentin" }, b: { pseudo: "Lucas" }, c: { pseudo: "Max" } } };
+  const state = {
+    leagues: {},
+    users: { a: { pseudo: "Quentin" }, b: { pseudo: "Lucas" }, c: { pseudo: "Max" } },
+  };
   const [a, b, c] = ["a", "b", "c"].map((id) => ({ id }));
   const l = createLeague(state, a, { name: "Tifosi" });
   joinLeague(state, b, { code: l.code });
@@ -223,10 +336,13 @@ test("Chat de ligue : membres seulement, rythme limité, modération", () => {
   throws(() => postMessage(state, a, l.id, { text: "x".repeat(281) }, { now: 5000 }), 400);
   postMessage(state, a, l.id, { text: "Allez Ferrari" }, { now: 5000 });
   const view = messagesOf(state, b, l.id);
-  assert.deepEqual(view.messages.map((m) => [m.pseudo, m.text, m.mine]), [
-    ["Lucas", "Hülkenberg vainqueur ? 😂", true],
-    ["Quentin", "Allez Ferrari", false],
-  ]);
+  assert.deepEqual(
+    view.messages.map((m) => [m.pseudo, m.text, m.mine]),
+    [
+      ["Lucas", "Hülkenberg vainqueur ? 😂", true],
+      ["Quentin", "Allez Ferrari", false],
+    ],
+  );
   throws(() => deleteMessage(state, b, l.id, view.messages[1].id), 403); // pas son message
   deleteMessage(state, a, l.id, view.messages[0].id); // le créateur modère
   assert.equal(messagesOf(state, a, l.id).messages.length, 1);
@@ -246,14 +362,30 @@ test("Pronos des champions : fermeture, validation, points", () => {
 });
 
 test("Palmarès par saison et rotation des sauvegardes", () => {
-  const rounds = { "f1-2025-24": { a: 10, b: 30 }, "f1-2026-1": { a: 50 }, "champions-2026": { b: 80 } };
+  const rounds = {
+    "f1-2025-24": { a: 10, b: 30 },
+    "f1-2026-1": { a: 50 },
+    "champions-2026": { b: 80 },
+  };
   assert.deepEqual(standingsBySeason(rounds), {
-    2025: [{ id: "b", points: 30 }, { id: "a", points: 10 }],
-    2026: [{ id: "b", points: 80 }, { id: "a", points: 50 }],
+    2025: [
+      { id: "b", points: 30 },
+      { id: "a", points: 10 },
+    ],
+    2026: [
+      { id: "b", points: 80 },
+      { id: "a", points: 50 },
+    ],
   });
   assert.equal(backupName(new Date("2026-10-16T08:00:00Z")), "game-2026-10-16.json");
-  const names = Array.from({ length: 16 }, (_, i) => `game-2026-10-${String(i + 1).padStart(2, "0")}.json`);
-  assert.deepEqual(backupsToDelete([...names, "autre.txt"]), ["game-2026-10-01.json", "game-2026-10-02.json"]);
+  const names = Array.from(
+    { length: 16 },
+    (_, i) => `game-2026-10-${String(i + 1).padStart(2, "0")}.json`,
+  );
+  assert.deepEqual(backupsToDelete([...names, "autre.txt"]), [
+    "game-2026-10-01.json",
+    "game-2026-10-02.json",
+  ]);
 });
 
 test("Qualifs : provisoire sur le classement, puis grille officielle (pénalités)", () => {
@@ -268,10 +400,25 @@ test("Qualifs : provisoire sur le classement, puis grille officielle (pénalité
   assert.deepEqual(qualiReference({ Qualifying: quali }), { rows: quali, grid: false });
   const ref = qualiReference({ Qualifying: quali, Race: race });
   assert.equal(ref.grid, true);
-  assert.deepEqual(ref.rows.map((r) => r.driverId), ["d2", "d4", "d1", "d3"]);
+  assert.deepEqual(
+    ref.rows.map((r) => r.driverId),
+    ["d2", "d4", "d1", "d3"],
+  );
   const bet = { quali: ["d1", "d2", "d3", "d4", ...Array.from({ length: 6 }, (_, i) => `x${i}`)] };
   const before = scoreBet(bet, { Qualifying: quali });
   const after = scoreBet(bet, { Qualifying: quali, Race: race });
   assert.deepEqual(before.quali.slots.slice(0, 4), [10, 10, 10, 10]);
   assert.deepEqual(after.quali.slots.slice(0, 4), [2, 5, 5, 2]); // corrigé avec la grille
+});
+
+test("Résultats définitifs 3 jours après la course : les pénalités d'après-course sont reprises", async () => {
+  const { resultsSettled } = await import("../src/bets.mjs");
+  const race = Date.parse("2026-11-01T20:00:00Z");
+  const event = { id: "gp", sessions: [{ type: "Race", startsAt: new Date(race).toISOString() }] };
+  const results = { "gp:Race": [{ driverId: "a", position: 1 }] };
+  const H = 3600000;
+  assert.equal(resultsSettled(event, {}, race + 100 * H), false); // pas encore publiés
+  assert.equal(resultsSettled(event, results, race + 3 * H), false); // pénalités possibles
+  assert.equal(resultsSettled(event, results, race + 71 * H), false);
+  assert.equal(resultsSettled(event, results, race + 73 * H), true);
 });
