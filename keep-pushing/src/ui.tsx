@@ -433,6 +433,11 @@ export function ResultRows({ sessionId }: { sessionId: string }) {
   }
   return (
     <View style={s.card}>
+      {rows[0]?.corrected && (
+        <Text style={s.small}>
+          ⚖️ Classement corrigé après pénalités (temps d’origine affichés).
+        </Text>
+      )}
       {rows.map((r) => (
         <View style={[s.rank, r.driverId === prefs.myDriver && s.mine]} key={r.position}>
           <Text style={s.position}>{r.position}</Text>

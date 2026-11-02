@@ -4,6 +4,7 @@ import { demoSeason } from "./data.mjs";
 import { loadRound, loadSeason } from "./jolpica.mjs";
 import { loadNews, toArticle } from "./news.mjs";
 import { api, hasApi } from "./api.mjs";
+import { withOverrides } from "./results.mjs";
 import { notifyNow } from "./reminders";
 import {
   applySynced,
@@ -38,7 +39,15 @@ export type Prefs = {
   results: boolean;
 };
 export type Session = { id: string; type: string; label: string; startsAt: string };
-export type Row = { position: number; driverId: string; name: string; team: string; value: string };
+export type Row = {
+  position: number;
+  driverId: string;
+  name: string;
+  team: string;
+  value: string;
+  // Classement corrigé par un admin (pénalité pas encore reportée par Jolpica).
+  corrected?: boolean;
+};
 export type Event = {
   id: string;
   competition: string;
@@ -114,6 +123,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (Date.parse(event.sessions[0].startsAt) > Date.now()) return;
     requested.current.add(event.id);
     loadRound(event)
+      .then(async (more) => {
+        // Corrections des admins, si le serveur en a pour ce GP.
+        const fixes = hasApi()
+          ? await api(`/api/results/${event.id}/overrides`).catch(() => ({}))
+          : {};
+        return withOverrides(more, fixes);
+      })
       .then((more) => setSeason((x) => ({ ...x, results: { ...x.results, ...more } })))
       .catch(() => requested.current.delete(event.id));
   };

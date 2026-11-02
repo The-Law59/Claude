@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Platform, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { PARTS } from "../src/bets.mjs";
+import { OVERRIDE_SIZE } from "../src/results.mjs";
 import { useStore } from "../src/store";
 import { Button, Screen, formatDate, useCall, useTheme } from "../src/ui";
 
@@ -559,6 +560,157 @@ function BetsAdmin() {
         Un prono saisi ici compte même si la partie est fermée : réservez-le aux joueurs qui vous
         ont donné leur liste avant la fermeture.
       </Text>
+      <ResultFix eventId={event.id} />
+    </View>
+  );
+}
+
+// --- Classement officiel corrigé (pénalité pas encore reportée par Jolpica).
+type SessionType = keyof typeof OVERRIDE_SIZE;
+const SESSION_LABEL: Record<SessionType, string> = {
+  Race: "Course",
+  Qualifying: "Qualifs",
+  Sprint: "Sprint",
+};
+function ResultFix({ eventId }: { eventId: string }) {
+  const { s, c, team } = useTheme();
+  const { season, loadResults } = useStore();
+  const call = useCall();
+  const event = season.events.find((e) => e.id === eventId)!;
+  const types = (Object.keys(OVERRIDE_SIZE) as SessionType[]).filter((t) =>
+    event.sessions.some((x) => x.type === t),
+  );
+  const [type, setType] = useState<SessionType>("Race");
+  const [fixes, setFixes] = useState<Record<string, { ids: string[] }>>({});
+  const [ids, setIds] = useState<string[] | null>(null);
+  const [error, setError] = useState("");
+  const sessionId = `${eventId}:${type}`;
+  useEffect(() => {
+    loadResults(event);
+    setIds(null);
+    call(`/api/results/${eventId}/overrides`)
+      .then(setFixes)
+      .catch(() => setFixes({}));
+  }, [eventId, call]);
+  const rows = season.results[sessionId] ?? [];
+  const last = (id: string) =>
+    season.drivers
+      .find((d) => d.id === id)
+      ?.name.split(" ")
+      .at(-1) ?? id;
+  const size = OVERRIDE_SIZE[type];
+  const send = async (method: "PUT" | "DELETE") => {
+    try {
+      const r = await call(`/api/admin/results/${sessionId}`, {
+        method,
+        body: method === "PUT" ? { ids } : undefined,
+      });
+      setFixes((f) => {
+        const next = { ...f };
+        if (r) next[sessionId] = r;
+        else delete next[sessionId];
+        return next;
+      });
+      setIds(null);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Enregistrement impossible.");
+    }
+  };
+  const fix = fixes[sessionId];
+  return (
+    <View style={{ gap: 8, marginTop: 12 }}>
+      <Text style={s.label}>CLASSEMENT OFFICIEL (PÉNALITÉS)</Text>
+      <Text style={s.small}>
+        Si une pénalité d’après-course n’est pas encore reportée par notre source, saisissez l’ordre
+        officiel : les points des pronos sont recalculés tout de suite.
+      </Text>
+      <View style={s.pills}>
+        {types.map((t) => (
+          <Pressable
+            key={t}
+            accessibilityRole="button"
+            accessibilityState={{ selected: t === type }}
+            onPress={() => {
+              setType(t);
+              setIds(null);
+            }}
+            style={[s.pill, t === type && { borderColor: c.accent, backgroundColor: c.soft }]}
+          >
+            <Text style={s.text}>{SESSION_LABEL[t]}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {fix ? (
+        <>
+          <Text style={[s.text, { color: c.green }]}>
+            ⚖️ Correction active : {fix.ids.map((id, i) => `${i + 1}. ${last(id)}`).join("  ")}
+          </Text>
+          {!ids && (
+            <Button label="Retirer la correction" secondary onPress={() => send("DELETE")} />
+          )}
+        </>
+      ) : (
+        <Text style={s.small}>
+          Classement actuel :{" "}
+          {rows
+            .slice(0, 12)
+            .map((r) => `${r.position}. ${last(r.driverId)}`)
+            .join("  ") || "pas encore publié."}
+        </Text>
+      )}
+      {!ids ? (
+        <Button
+          label={`✏️ Corriger le classement ${SESSION_LABEL[type].toLowerCase()}`}
+          secondary
+          onPress={() => setIds([])}
+        />
+      ) : (
+        <View style={{ gap: 8 }}>
+          <Text style={s.small}>
+            Touchez les pilotes dans l’ordre officiel : au moins le top {size}, et jusqu’au pilote
+            pénalisé le plus bas pour un classement complet. Retouchez un pilote pour le retirer.
+          </Text>
+          <Text style={s.text}>
+            {ids.map((id, i) => `${i + 1}. ${last(id)}`).join("  ") || "—"}
+          </Text>
+          <View style={s.pills}>
+            {season.drivers.map((d) => {
+              const at = ids.indexOf(d.id);
+              return (
+                <Pressable
+                  key={d.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={d.name}
+                  onPress={() => setIds(at !== -1 ? ids.filter((x) => x !== d.id) : [...ids, d.id])}
+                  style={[
+                    s.pill,
+                    { borderColor: team(d.teamId) },
+                    at !== -1 && { backgroundColor: c.soft, borderWidth: 2 },
+                  ]}
+                >
+                  <Text style={[s.text, { color: team(d.teamId) }]}>
+                    {at !== -1 ? `${at + 1}. ` : ""}
+                    {d.name.split(" ").at(-1)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {!!error && <Text style={s.error}>{error}</Text>}
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Button label="Vider" secondary onPress={() => setIds([])} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button label="Annuler" secondary onPress={() => setIds(null)} />
+            </View>
+          </View>
+          {ids.length >= size && (
+            <Button label="✅ Enregistrer le classement officiel" onPress={() => send("PUT")} />
+          )}
+        </View>
+      )}
     </View>
   );
 }

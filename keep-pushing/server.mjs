@@ -23,6 +23,7 @@ import * as monitor from "./src/monitor.mjs";
 import { createPracticeSource, isPractice } from "./src/practice.mjs";
 import * as ads from "./src/ads.mjs";
 import * as mercato from "./src/mercato.mjs";
+import { checkOverride, withOverrides } from "./src/results.mjs";
 import { exactCount, highlights } from "./src/recap.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
@@ -89,7 +90,7 @@ await refreshSeason();
 setInterval(refreshSeason, 60 * 60 * 1000);
 
 // Résultats d'un week-end : gardés pour de bon une fois définitifs (course
-// publiée depuis 3 jours, pénalités d'après-course comprises), sinon
+// publiée depuis 7 jours, pénalités d'après-course comprises), sinon
 // redemandés au plus toutes les 10 min. Une requête Jolpica à la fois
 // (l'API limite les rafales).
 const rounds = new Map();
@@ -97,7 +98,10 @@ const inflight = new Map();
 let queue = Promise.resolve();
 async function roundResults(event) {
   const cached = rounds.get(event.id);
-  if (cached && (cached.final || Date.now() - cached.at < 10 * 60 * 1000)) return cached.results;
+  // Corrections des admins (pénalités pas encore reportées par Jolpica) appliquées à la lecture.
+  const corrected = (results) => withOverrides(results, state.resultOverrides);
+  if (cached && (cached.final || Date.now() - cached.at < 10 * 60 * 1000))
+    return corrected(cached.results);
   const first = Math.min(...bets.partsOf(event).map((p) => bets.closesAt(event, p)));
   if (Date.now() < first) return {};
   if (!inflight.has(event.id)) {
@@ -109,7 +113,7 @@ async function roundResults(event) {
           at: Date.now(),
           final: bets.resultsSettled(event, results),
         });
-        return results;
+        return corrected(results);
       })
       .finally(() => inflight.delete(event.id));
     inflight.set(event.id, next);
@@ -118,7 +122,7 @@ async function roundResults(event) {
   return inflight.get(event.id);
 }
 const bySession = (eventId) => {
-  const r = rounds.get(eventId)?.results;
+  const r = withOverrides(rounds.get(eventId)?.results, state.resultOverrides);
   return (
     r && Object.fromEntries(["Qualifying", "Sprint", "Race"].map((t) => [t, r[`${eventId}:${t}`]]))
   );
@@ -609,6 +613,17 @@ async function api(req, path) {
     const h = monitor.health({ startedAt: STARTED, version: VERSION, season, news, saveError });
     return [h.ok ? 200 : 503, h];
   }
+  // Classements corrigés d'un GP (lus par l'appli pour l'affichage).
+  const overrides = path.match(/^\/api\/results\/([\w-]+)\/overrides$/);
+  if (overrides)
+    return [
+      200,
+      Object.fromEntries(
+        Object.entries(state.resultOverrides ?? {}).filter(([id]) =>
+          id.startsWith(`${overrides[1]}:`),
+        ),
+      ),
+    ];
   if (path === "/api/errors" && req.method === "POST") {
     if (!allowReport(req.socket.remoteAddress)) return [429, { error: "Trop de rapports." }];
     const body = await readJson(req);
@@ -732,6 +747,26 @@ async function api(req, path) {
       await save();
     }
     return [200, { parts: bets.partsOf(event), rows: admin.betsOf(state, event.id) }];
+  }
+  const fix = path.match(/^\/api\/admin\/results\/([\w-]+:\w+)$/);
+  if (fix) {
+    const me = adminOnly();
+    const [eventId] = fix[1].split(":");
+    if (!findEvent(eventId)) return [404, { error: "Grand Prix inconnu." }];
+    state.resultOverrides ??= {};
+    if (req.method === "PUT") {
+      const ids = (await readJson(req))?.ids;
+      const problem = checkOverride(
+        fix[1],
+        ids,
+        season.drivers.map((d) => d.id),
+      );
+      if (problem) return [400, { error: problem }];
+      state.resultOverrides[fix[1]] = { ids, by: me.id, at: Date.now() };
+    } else if (req.method === "DELETE") delete state.resultOverrides[fix[1]];
+    else return [405, { error: "Méthode non permise." }];
+    await save();
+    return [200, state.resultOverrides[fix[1]] ?? null];
   }
   if (path === "/api/admin/errors/resolve" && req.method === "POST") {
     adminOnly();

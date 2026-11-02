@@ -411,7 +411,7 @@ test("Qualifs : provisoire sur le classement, puis grille officielle (pénalité
   assert.deepEqual(after.quali.slots.slice(0, 4), [2, 5, 5, 2]); // corrigé avec la grille
 });
 
-test("Résultats définitifs 3 jours après la course : les pénalités d'après-course sont reprises", async () => {
+test("Résultats définitifs 7 jours après la course : les pénalités d'après-course sont reprises", async () => {
   const { resultsSettled } = await import("../src/bets.mjs");
   const race = Date.parse("2026-11-01T20:00:00Z");
   const event = { id: "gp", sessions: [{ type: "Race", startsAt: new Date(race).toISOString() }] };
@@ -419,6 +419,6 @@ test("Résultats définitifs 3 jours après la course : les pénalités d'après
   const H = 3600000;
   assert.equal(resultsSettled(event, {}, race + 100 * H), false); // pas encore publiés
   assert.equal(resultsSettled(event, results, race + 3 * H), false); // pénalités possibles
-  assert.equal(resultsSettled(event, results, race + 71 * H), false);
-  assert.equal(resultsSettled(event, results, race + 73 * H), true);
+  assert.equal(resultsSettled(event, results, race + 167 * H), false);
+  assert.equal(resultsSettled(event, results, race + 169 * H), true);
 });

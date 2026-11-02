@@ -250,10 +250,10 @@ export function history(userIds, rounds, order, me) {
     });
 }
 
-// Résultats définitifs : course publiée et 3 jours écoulés depuis le départ.
+// Résultats définitifs : course publiée et 7 jours écoulés depuis le départ.
 // Avant, les pénalités d'après-course (et leurs corrections chez Jolpica)
 // peuvent encore changer le classement : on le relit régulièrement.
-export const SETTLE_DAYS = 3;
+export const SETTLE_DAYS = 7;
 export function resultsSettled(event, results, now = Date.now()) {
   const race = event.sessions.find((s) => s.type === "Race");
   return (
