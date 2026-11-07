@@ -27,7 +27,16 @@ export function reportCrash(error: unknown, where = "") {
 // Erreurs non rattrapées : navigateur (web) ou moteur JavaScript (mobile).
 export function installCrashReporting() {
   if (Platform.OS === "web" && typeof window !== "undefined") {
-    window.addEventListener("error", (ev) => reportCrash(ev.error ?? ev.message));
+    window.addEventListener("error", (ev) => {
+      // « Script error. » sans détail : script d'un autre site (extension,
+      // navigateur intégré d'Instagram/Facebook, traduction automatique…).
+      // Le navigateur masque tout : ce n'est pas une erreur de l'appli.
+      const foreign =
+        !ev.error &&
+        (ev.message === "Script error." ||
+          (!!ev.filename && !ev.filename.startsWith(location.origin)));
+      if (!foreign) reportCrash(ev.error ?? ev.message);
+    });
     window.addEventListener("unhandledrejection", (ev) => reportCrash(ev.reason));
     return;
   }
