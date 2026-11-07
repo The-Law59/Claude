@@ -16,6 +16,46 @@ export const TEAM_COLORS = {
 };
 export const accentFor = (teamId) => TEAM_COLORS[teamId] ?? DEFAULT_ACCENT;
 
+// Teinte vive de chaque écurie : lueurs, bordures et onglets du thème sombre.
+export const DEFAULT_GLOW = "#ff5a3d";
+export const TEAM_GLOW = {
+  "team-ferrari": "#ff3045",
+  "team-mercedes": "#19d3bf",
+  "team-red_bull": "#4d7bff",
+  "team-mclaren": "#ff8a1f",
+  "team-aston_martin": "#2fd39a",
+  "team-alpine": "#ff6fae",
+  "team-williams": "#3c8cff",
+  "team-rb": "#7d95ff",
+  "team-haas": "#ff3b30",
+  "team-audi": "#ff3b4f",
+  "team-cadillac": "#d4af37",
+};
+export const glowFor = (teamId) => TEAM_GLOW[teamId] ?? DEFAULT_GLOW;
+
+// Badge d'écurie : initiales dessinées par l'appli (pas de logo officiel).
+export const TEAM_INITIALS = {
+  "team-ferrari": "SF",
+  "team-mercedes": "MER",
+  "team-red_bull": "RBR",
+  "team-mclaren": "MCL",
+  "team-aston_martin": "AMR",
+  "team-alpine": "ALP",
+  "team-williams": "WIL",
+  "team-rb": "RB",
+  "team-haas": "HAAS",
+  "team-audi": "AUD",
+  "team-cadillac": "CAD",
+};
+export const initialsFor = (teamId, name = "") =>
+  TEAM_INITIALS[teamId] ??
+  name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 3)
+    .toUpperCase();
+
 const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 const luminance = (hex) => {
   const [r, g, b] = rgb(hex).map((v) => {

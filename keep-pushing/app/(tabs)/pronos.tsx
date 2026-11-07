@@ -5,6 +5,7 @@ import { api, hasApi } from "../../src/api.mjs";
 import { PARTS, POINTS } from "../../src/bets.mjs";
 import { CHAMPION_POINTS } from "../../src/seasons.mjs";
 import { RecapCard } from "../../src/RecapCard";
+import { Countdown, Hero } from "../../src/design";
 import { useStore } from "../../src/store";
 import {
   Button,
@@ -82,16 +83,107 @@ type Boards = {
 
 const LABELS: Record<Part, string> = { quali: "Qualifications", sprint: "Sprint", race: "Course" };
 
+// Prochaine fermeture parmi les paris ouverts, et la session concernée.
+const OPENABLE = ["fastest", "dnf", "answer", "joker"];
+const nextClose = (view: BetView, parts: Part[], open: (p: string) => boolean) =>
+  Math.min(...[...parts, ...OPENABLE].filter(open).map((p) => view.closes[p]));
+const closing = (view: BetView, parts: Part[], open: (p: string) => boolean) => {
+  const at = nextClose(view, parts, open);
+  const part = parts.find((p) => open(p) && view.closes[p] === at);
+  return part ? LABELS[part] : "Course";
+};
+
+// État de chaque pari du week-end : à faire, prêt, points marqués.
+function PartsStatus({
+  view,
+  parts,
+  open,
+  onOpen,
+}: {
+  view: BetView;
+  parts: Part[];
+  open: (p: string) => boolean;
+  onOpen: () => void;
+}) {
+  const { s, c } = useTheme();
+  const mine = view.mine ?? {};
+  const sc = view.score;
+  const rows: [string, string, string, string][] = [
+    ...parts.map((p): [string, string, string, string] => [
+      p,
+      p === "race" ? "🏆" : p === "sprint" ? "⚡" : "⏱",
+      `Top ${PARTS[p].size} ${p === "quali" ? "des qualifs" : p === "sprint" ? "du sprint" : "de la course"}`,
+      `Classe les ${PARTS[p].size} premiers`,
+    ]),
+    ["fastest", "🟣", "Meilleur tour", "Quel pilote ?"],
+    ["dnf", "💥", "Abandons", "Combien de pilotes ?"],
+    ["answer", "❓", "Question du week-end", view.question.text],
+  ];
+  const state = (key: string): [string, string] => {
+    const points = sc?.[key as Part];
+    const scored = typeof points === "object" && points ? points.total : (points as number | null);
+    if (scored !== null && scored !== undefined) return [`✓ ${scored} pts`, c.green];
+    const done = mine[key as keyof Bet] !== undefined;
+    if (open(key)) return done ? ["✓ Prêt", c.green] : ["À faire ›", c.glow];
+    if (Date.now() < view.opens[key]) return [`Ouvre ${formatDate(view.opens[key])}`, c.muted];
+    return [done ? "✓ Envoyé" : "—", done ? c.green : c.muted];
+  };
+  return (
+    <View style={[s.card, { paddingVertical: 4 }]}>
+      {rows.map(([key, icon, title, hint], i) => {
+        const [label, color] = state(key);
+        return (
+          <Pressable
+            key={key}
+            accessibilityRole="button"
+            disabled={!open(key)}
+            onPress={onOpen}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              paddingVertical: 11,
+              borderBottomWidth: i < rows.length - 1 ? 1 : 0,
+              borderBottomColor: c.line,
+            }}
+          >
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 11,
+                backgroundColor: c.chip,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 17 }}>{icon}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.text, { fontWeight: "700" }]}>{title}</Text>
+              <Text style={s.small} numberOfLines={1}>
+                {hint}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 13, fontWeight: "800", color }}>{label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function Pronos() {
   const { s } = useTheme();
   const { prefs, season } = useStore();
   const router = useRouter();
   const [tab, setTab] = useState<"bet" | "rank" | "season">("bet");
   // Lien d'une notification de ligue : …/pronos?league=<id>.
-  const { league } = useLocalSearchParams<{ league?: string }>();
+  // Raccourci « Ma ligue » de l'accueil : …/pronos?tab=rank.
+  const { league, tab: wanted } = useLocalSearchParams<{ league?: string; tab?: string }>();
   useEffect(() => {
-    if (league) setTab("rank");
-  }, [league]);
+    if (league || wanted === "rank") setTab("rank");
+  }, [league, wanted]);
   if (!hasApi() || season.mode !== "live")
     return (
       <Screen>
@@ -320,6 +412,20 @@ function Weekend() {
         !error && <Text style={s.small}>Chargement…</Text>
       ) : (
         <>
+          {anyOpen && (
+            <Hero
+              label={`🏁 ${closing(view, parts, open)} : fermeture dans`}
+              onPress={() => router.push(`/bet-wizard?event=${event.id}`)}
+            >
+              <Countdown to={nextClose(view, parts, open)} />
+            </Hero>
+          )}
+          <PartsStatus
+            view={view}
+            parts={parts}
+            open={open}
+            onOpen={() => router.push(`/bet-wizard?event=${event.id}`)}
+          />
           {sc && (
             <StepTotals score={sc} parts={parts} shown={shown} grid={!!view.results.qualiGrid} />
           )}

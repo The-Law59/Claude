@@ -14,20 +14,21 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { api, hasApi } from "./api.mjs";
 import { articleVisible, setProtected } from "./model.mjs";
-import { DEFAULT_ACCENT, accentFor, mix, readableOn, tint } from "./teams.mjs";
+import { DEFAULT_ACCENT, accentFor, glowFor, mix, readableOn, tint } from "./teams.mjs";
 import { type Row, useStore } from "./store";
 
 const light = {
-  bg: "#f5f6f8",
+  bg: "#f3f5f8",
   card: "#ffffff",
-  ink: "#202631",
-  muted: "#626c79",
+  ink: "#1d232d",
+  muted: "#5d6775",
   accent: DEFAULT_ACCENT,
   accentBg: DEFAULT_ACCENT, // fond des boutons (texte blanc)
-  line: "#dce0e6",
+  glow: DEFAULT_ACCENT, // lueurs, bordures mises en avant, onglet actif
+  line: "#dfe3e9",
   soft: tint(DEFAULT_ACCENT),
   green: "#2e6746",
-  chip: "#e8ebef",
+  chip: "#e9edf2",
   lock: "#e7efe8",
   lockOn: "#e4eee6",
   warn: "#fbeedd",
@@ -36,13 +37,13 @@ const light = {
 };
 const dark = {
   ...light,
-  bg: "#0e1115",
-  card: "#181c22",
-  ink: "#e9ecf0",
-  muted: "#a1abb8",
-  line: "#2c333d",
+  bg: "#0b0e13",
+  card: "#141920",
+  ink: "#eef1f5",
+  muted: "#98a2b0",
+  line: "#242b35",
   green: "#7cc99a",
-  chip: "#232932",
+  chip: "#1c222b",
   lock: "#17251c",
   lockOn: "#1d3324",
   warn: "#3a2a14",
@@ -67,11 +68,13 @@ export function useTheme() {
   return useMemo(() => {
     const base = accentFor(prefs.myTeam);
     if (!isDark) {
-      const c = { ...light, accent: base, accentBg: base, soft: tint(base) };
+      const c = { ...light, accent: base, accentBg: base, glow: base, soft: tint(base) };
       return { c, s: makeStyles(c), dark: false, team: (id: string) => accentFor(id) };
     }
     const soft = mix(base, dark.card, 0.75);
-    const c = { ...dark, accentBg: base, soft, accent: readableOn(base, soft) };
+    // Teinte vive de l'écurie, éclaircie si besoin pour rester lisible en texte.
+    const glow = readableOn(glowFor(prefs.myTeam), dark.card);
+    const c = { ...dark, accentBg: base, soft, glow, accent: readableOn(glow, soft) };
     // Repère un peu plus clair que les cartes : lisible aussi sur les lignes surlignées.
     const team = (id: string) => readableOn(accentFor(id), "#262c35");
     return { c, s: makeStyles(c), dark: true, team };
@@ -155,7 +158,14 @@ export function Pills<T extends string | number | boolean>({
 }
 
 // En-tête commun : menu ☰, marque, notifications, origine des données.
-export function Screen({ children }: { children: React.ReactNode }) {
+// overlay : bouton flottant (ex. « + » du forum), hors du défilement.
+export function Screen({
+  children,
+  overlay,
+}: {
+  children: React.ReactNode;
+  overlay?: React.ReactNode;
+}) {
   const { c, s, dark } = useTheme();
   const { prefs, season, error, inbox } = useStore();
   const router = useRouter();
@@ -169,17 +179,16 @@ export function Screen({ children }: { children: React.ReactNode }) {
           accessibilityRole="button"
           accessibilityLabel="Ouvrir le menu"
           onPress={() => setMenu(true)}
-          style={[s.iconButton, { marginRight: 12 }]}
+          style={s.iconButton}
         >
           <Text style={{ color: c.ink, fontSize: 22 }}>☰</Text>
         </Pressable>
-        <View style={{ flex: 1 }}>
-          <Text style={s.brand}>
-            Keep <Text style={{ color: c.accent }}>Pushing.</Text>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={s.brand} accessibilityRole="header">
+            Keep <Text style={{ color: c.glow }}>Pushing.</Text>
           </Text>
-          <Text style={s.small}>La F1 à votre rythme.</Text>
         </View>
-        <View style={{ flexDirection: "row", gap: 8 }}>
+        <View style={{ flexDirection: "row", gap: 8, minWidth: 46, justifyContent: "flex-end" }}>
           {/* Anti-spoil : visible seulement quand il protège quelque chose. */}
           {protectedAny && (
             <Pressable
@@ -220,6 +229,7 @@ export function Screen({ children }: { children: React.ReactNode }) {
         </Text>
       )}
       <ScrollView contentContainerStyle={s.content}>{children}</ScrollView>
+      {overlay}
     </SafeAreaView>
   );
 }
@@ -463,24 +473,24 @@ const makeStyles = (c: typeof light) =>
       backgroundColor: c.bg,
     },
     header: {
-      paddingHorizontal: 22,
-      paddingTop: 14,
-      paddingBottom: 12,
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 8,
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
     },
     brand: {
-      fontSize: 26,
-      fontWeight: "800",
+      fontSize: 23,
+      fontWeight: "900",
       fontStyle: "italic",
       letterSpacing: -1,
       color: c.ink,
     },
     iconButton: {
-      width: 48,
-      height: 48,
-      borderRadius: 12,
+      width: 46,
+      height: 46,
+      borderRadius: 14,
       backgroundColor: c.chip,
       alignItems: "center",
       justifyContent: "center",
@@ -516,9 +526,9 @@ const makeStyles = (c: typeof light) =>
       alignItems: "center",
       justifyContent: "center",
     },
-    demo: { paddingHorizontal: 22, paddingVertical: 8 },
+    demo: { paddingHorizontal: 18, paddingBottom: 6, alignItems: "center" },
     content: {
-      paddingHorizontal: 22,
+      paddingHorizontal: 16,
       paddingTop: 10,
       paddingBottom: 30,
       gap: 12,
@@ -528,13 +538,13 @@ const makeStyles = (c: typeof light) =>
     },
     title: {
       fontSize: 28,
-      fontWeight: "700",
+      fontWeight: "800",
       letterSpacing: -0.8,
       color: c.ink,
       marginTop: 8,
     },
     subtitle: { fontSize: 14, color: c.muted },
-    heading: { fontSize: 19, fontWeight: "700", color: c.ink, marginTop: 12 },
+    heading: { fontSize: 19, fontWeight: "800", color: c.ink, marginTop: 12 },
     text: { fontSize: 15, lineHeight: 22, color: c.ink },
     small: { fontSize: 12, lineHeight: 18, color: c.muted },
     tiny: { fontSize: 11, color: c.muted },
@@ -551,14 +561,20 @@ const makeStyles = (c: typeof light) =>
     button: {
       backgroundColor: c.accentBg,
       paddingHorizontal: 16,
-      paddingVertical: 13,
-      borderRadius: 10,
-      minHeight: 46,
+      paddingVertical: 14,
+      borderRadius: 14,
+      minHeight: 48,
       alignItems: "center",
+      justifyContent: "center",
       marginTop: 8,
+      shadowColor: c.accentBg,
+      shadowOpacity: 0.35,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 5 },
+      elevation: 4,
     },
-    buttonText: { fontSize: 14, fontWeight: "700", color: "#fff" },
-    secondary: { backgroundColor: c.soft },
+    buttonText: { fontSize: 15, fontWeight: "800", color: "#fff" },
+    secondary: { backgroundColor: c.soft, shadowOpacity: 0, elevation: 0 },
     pills: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginVertical: 6 },
     pill: {
       paddingHorizontal: 15,
@@ -568,15 +584,32 @@ const makeStyles = (c: typeof light) =>
       borderWidth: 1,
       borderColor: c.line,
     },
-    pillActive: { backgroundColor: c.ink, borderColor: c.ink },
-    pillTextActive: { color: c.bg, fontSize: 15 },
-    card: { backgroundColor: c.card, borderRadius: 14, padding: 18, gap: 8 },
+    pillActive: { backgroundColor: c.accentBg, borderColor: c.accentBg },
+    pillTextActive: { color: "#fff", fontSize: 15, fontWeight: "700" },
+    card: {
+      backgroundColor: c.card,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: c.line,
+      padding: 16,
+      gap: 8,
+    },
+    // Carte mise en avant : bordure et lueur aux couleurs de l'écurie.
+    glowCard: {
+      borderWidth: 2,
+      borderColor: c.glow,
+      shadowColor: c.glow,
+      shadowOpacity: 0.3,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: 3,
+    },
     cardSummary: { fontSize: 14, lineHeight: 20, color: c.muted },
     cardTitle: { fontSize: 18, fontWeight: "600", lineHeight: 25, color: c.ink },
     label: {
       fontSize: 11,
-      fontWeight: "700",
-      letterSpacing: 0.8,
+      fontWeight: "800",
+      letterSpacing: 1.2,
       color: c.accent,
     },
     badgeRow: { flexDirection: "row", gap: 6 },
@@ -596,7 +629,7 @@ const makeStyles = (c: typeof light) =>
       paddingHorizontal: 10,
       borderRadius: 8,
     },
-    lock: { padding: 18, borderRadius: 14, backgroundColor: c.lock, gap: 8 },
+    lock: { padding: 16, borderRadius: 18, backgroundColor: c.lock, gap: 8 },
     rank: {
       flexDirection: "row",
       alignItems: "center",

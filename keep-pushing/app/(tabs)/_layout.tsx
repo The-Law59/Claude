@@ -27,9 +27,10 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: c.accent,
+        tabBarActiveTintColor: c.glow,
         tabBarInactiveTintColor: c.muted,
-        tabBarStyle: { backgroundColor: c.card, borderTopColor: c.line },
+        tabBarStyle: { backgroundColor: c.card, borderTopColor: c.line, height: 64, paddingTop: 6 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "700" },
       }}
     >
       {tabs.map(([name, icon, title]) => (

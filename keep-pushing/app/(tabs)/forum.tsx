@@ -7,6 +7,18 @@ import { useStore } from "../../src/store";
 import { Button, Pills, Screen, formatDate, useCall, useTheme } from "../../src/ui";
 
 type Category = keyof typeof CATEGORIES;
+const CATEGORY_ICONS: Record<Category, string> = {
+  reglementation: "📜",
+  weekend: "🏁",
+  pronos: "🎯",
+  divers: "💬",
+};
+const CATEGORY_HINTS: Record<Category, string> = {
+  reglementation: "Règles, FIA, sanctions",
+  weekend: "Débats, réactions",
+  pronos: "Stratégies, défis",
+  divers: "Tout le reste",
+};
 type Topic = {
   id: string;
   category: Category;
@@ -40,6 +52,7 @@ export default function Forum() {
   } | null>(null);
   const [error, setError] = useState("");
   const [writing, setWriting] = useState(false);
+  const [view, setView] = useState<"trending" | "recent" | "mine">("trending");
   const load = useCallback(() => {
     if (!prefs.account || !hasApi()) return;
     call(`/api/forum${category === "all" ? "" : `?category=${category}`}`)
@@ -77,18 +90,71 @@ export default function Forum() {
   const spoiler = (t: Topic) =>
     !!t.eventId && prefs.protectedSessions.some((id) => id.startsWith(`${t.eventId}:`));
   const eventName = (id: string | null) => season.events.find((e) => e.id === id)?.name;
+  // Tendances : sujets actifs ces 48 dernières heures, les plus commentés d'abord.
+  const DAY = 86400000;
+  const topics = (data?.topics ?? [])
+    .filter((t) => view !== "mine" || t.pseudo === prefs.account?.pseudo)
+    .slice()
+    .sort((a, b) =>
+      view === "trending"
+        ? Number(Date.now() - b.lastAt < 2 * DAY) - Number(Date.now() - a.lastAt < 2 * DAY) ||
+          b.replies - a.replies ||
+          b.lastAt - a.lastAt
+        : b.lastAt - a.lastAt,
+    );
   return (
-    <Screen>
+    <Screen
+      overlay={
+        !writing && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Nouveau sujet"
+            onPress={() => setWriting(true)}
+            style={{
+              position: "absolute",
+              right: 18,
+              bottom: 18,
+              width: 58,
+              height: 58,
+              borderRadius: 29,
+              backgroundColor: c.accentBg,
+              alignItems: "center",
+              justifyContent: "center",
+              shadowColor: c.accentBg,
+              shadowOpacity: 0.5,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 6,
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 30, lineHeight: 32 }}>+</Text>
+          </Pressable>
+        )
+      }
+    >
       <Text style={s.title}>Forum.</Text>
-      <Text style={s.subtitle}>
-        Le paddock des joueurs : débattez, comparez, chambrez (gentiment).
-      </Text>
+      <Text style={s.subtitle}>La communauté F1 de Keep Pushing.</Text>
       <Pills
-        options={[["all", "Tout"], ...(Object.entries(CATEGORIES) as [Category, string][])]}
-        value={category}
-        onChange={setCategory}
+        options={[
+          ["trending", "🔥 Tendances"],
+          ["recent", "Récents"],
+          ["mine", "Mes sujets"],
+        ]}
+        value={view}
+        onChange={setView}
       />
-      {writing ? (
+      {category !== "all" && (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setCategory("all")}
+          style={[s.pill, s.pillActive, { alignSelf: "flex-start" }]}
+        >
+          <Text style={s.pillTextActive}>
+            {CATEGORY_ICONS[category]} {CATEGORIES[category]} ✕
+          </Text>
+        </Pressable>
+      )}
+      {writing && (
         <NewTopic
           initial={category === "all" ? "divers" : category}
           events={[focus.current, focus.last].filter((e, i, a) => a.indexOf(e) === i)}
@@ -98,8 +164,6 @@ export default function Forum() {
             router.push(`/forum/${id}`);
           }}
         />
-      ) : (
-        <Button label="✏️ Nouveau sujet" onPress={() => setWriting(true)} />
       )}
       {!!error && <Text style={s.error}>{error}</Text>}
       {data?.admin && data.reported.length > 0 && (
@@ -125,7 +189,7 @@ export default function Forum() {
           ))}
         </View>
       )}
-      {(data?.topics ?? []).map((t) =>
+      {topics.map((t) =>
         spoiler(t) ? (
           <View key={t.id} style={s.lock}>
             <Text style={s.text}>
@@ -136,12 +200,38 @@ export default function Forum() {
           <TopicCard key={t.id} topic={t} event={eventName(t.eventId)} onChange={load} />
         ),
       )}
-      {data && !data.topics.length && (
-        <Text style={s.small}>Aucun sujet ici pour l’instant : lancez le premier débat !</Text>
+      {data && !topics.length && (
+        <Text style={s.small}>
+          {view === "mine"
+            ? "Vous n’avez pas encore lancé de sujet : touchez « + »."
+            : "Aucun sujet ici pour l’instant : lancez le premier débat avec « + » !"}
+        </Text>
       )}
+      <Text style={s.label}>CATÉGORIES</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {(Object.entries(CATEGORIES) as [Category, string][]).map(([id, label]) => (
+          <Pressable
+            key={id}
+            accessibilityRole="button"
+            accessibilityState={{ selected: category === id }}
+            onPress={() => setCategory(category === id ? "all" : id)}
+            style={[
+              s.card,
+              { width: "48.5%", gap: 4 },
+              category === id && { borderColor: c.glow, borderWidth: 2 },
+            ]}
+          >
+            <Text style={{ fontSize: 22 }}>{CATEGORY_ICONS[id]}</Text>
+            <Text style={[s.text, { fontWeight: "700" }]}>{label}</Text>
+            <Text style={s.small}>{CATEGORY_HINTS[id]}</Text>
+          </Pressable>
+        ))}
+      </View>
       <Text style={s.small}>
         Restez courtois. Un message qui pose problème ? « Signaler » le transmet aux modérateurs.
       </Text>
+      {/* Place pour le bouton « + » flottant. */}
+      <View style={{ height: 64 }} />
     </Screen>
   );
 }
