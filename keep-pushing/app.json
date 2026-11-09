@@ -4,7 +4,7 @@
     "slug": "keep-pushing",
     "version": "0.2.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.keeppushing.mobile"
