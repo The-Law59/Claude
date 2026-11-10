@@ -67,6 +67,13 @@ export default function Home() {
       {season.mode === "live" && (
         <CircuitCard
           circuitId={current.circuitId}
+          title={current.circuit}
+          subtitle={
+            current.location
+              ? `${current.location.locality}, ${current.location.country}`
+              : undefined
+          }
+          compact
           onPress={() => router.push(`/gp/${current.id}`)}
         />
       )}

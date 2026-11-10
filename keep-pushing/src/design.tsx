@@ -2,8 +2,10 @@
 // lignes de vitesse, damier, bordure de piste), compte à rebours, badge
 // d'écurie à initiales, vignettes. Dessinés en code : aucune image sous droits.
 import React, { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { circuitCard } from "./circuits";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import Svg, { G, Path, Rect } from "react-native-svg";
+import TRACKS from "./tracks.json";
+import { km, raceLaps } from "./trackinfo.mjs";
 import { LinearGradient } from "expo-linear-gradient";
 import { glowFor, initialsFor, mix } from "./teams.mjs";
 import { useTheme } from "./ui";
@@ -297,37 +299,113 @@ export function Shortcuts({
   );
 }
 
-// Carte du circuit (tracé, drapeau, longueur) si on en a une.
-export function CircuitCard({ circuitId, onPress }: { circuitId?: string; onPress?: () => void }) {
-  const { c } = useTheme();
-  const card = circuitCard(circuitId);
-  if (!card) return null;
-  // Cadre au format de l'image (le web ignore aspectRatio sur une Image seule).
-  const image = (
-    <View
-      style={{
-        width: "100%",
-        aspectRatio: card.ratio,
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: c.line,
-        overflow: "hidden",
-      }}
-    >
-      <Image
-        source={card.source}
-        accessibilityIgnoresInvertColors
-        accessible={false}
-        resizeMode="cover"
-        style={{ width: "100%", height: "100%" }}
-      />
+// Fiche du circuit : tracé vectoriel (net à toutes les tailles) aux couleurs
+// de l'écurie, départ et sens de course, longueur, tours, distance, 1er GP.
+// compact : tracé et longueur seulement (accueil).
+export function CircuitCard({
+  circuitId,
+  title,
+  subtitle,
+  compact = false,
+  onPress,
+}: {
+  circuitId?: string;
+  title?: string;
+  subtitle?: string;
+  compact?: boolean;
+  onPress?: () => void;
+}) {
+  const { c, s, dark } = useTheme();
+  const t = circuitId ? (TRACKS as Record<string, Track>)[circuitId] : undefined;
+  if (!t) return null;
+  const laps = raceLaps(circuitId!, t.length);
+  const outline = dark ? "#000000" : "#1d232d";
+  const stat = (label: string, value: string) => (
+    <View key={label} style={{ width: "50%", paddingVertical: 4 }}>
+      <Text style={[s.small, { fontSize: 11, letterSpacing: 0.8 }]}>{label.toUpperCase()}</Text>
+      <Text style={[s.cardTitle, { fontWeight: "800" }]} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  );
+  const card = (
+    <View style={[s.card, { gap: 10 }]}>
+      {!!title && (
+        <View>
+          <Text style={[s.cardTitle, { fontWeight: "900", fontSize: 19 }]} numberOfLines={1}>
+            {title}
+          </Text>
+          {!!subtitle && (
+            <Text style={s.small} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          )}
+        </View>
+      )}
+      <View
+        style={{ width: "100%", aspectRatio: t.w / t.h, maxHeight: compact ? 180 : 320 }}
+        accessible
+        accessibilityLabel={`Tracé du circuit${title ? ` : ${title}` : ""}`}
+      >
+        <Svg width="100%" height="100%" viewBox={`0 0 ${t.w} ${t.h}`}>
+          <Path d={t.path} stroke={outline} strokeWidth={30} fill="none" strokeLinejoin="round" />
+          <Path d={t.path} stroke={c.glow} strokeWidth={14} fill="none" strokeLinejoin="round" />
+          {/* Ligne de départ en damier, perpendiculaire au sens de course. */}
+          <G transform={`translate(${t.start[0]} ${t.start[1]}) rotate(${t.angle + 90})`}>
+            {[0, 1, 2, 3, 4, 5].map((i) =>
+              [0, 1].map((j) => (
+                <Rect
+                  key={`${i}-${j}`}
+                  x={-36 + i * 12}
+                  y={-12 + j * 12}
+                  width={12}
+                  height={12}
+                  fill={(i + j) % 2 ? "#ffffff" : "#000000"}
+                />
+              )),
+            )}
+          </G>
+          {/* Sens de course. */}
+          <G transform={`translate(${t.start[0]} ${t.start[1]}) rotate(${t.angle})`}>
+            <Path
+              d="M44 -18 L68 0 L44 18"
+              stroke={c.ink}
+              strokeWidth={9}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </G>
+        </Svg>
+      </View>
+      {compact ? (
+        <Text style={s.small}>
+          {km(t.length)} · {laps} tours
+        </Text>
+      ) : (
+        <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+          {stat("Longueur", km(t.length))}
+          {stat("Tours", String(laps))}
+          {stat("Distance", km(t.length * laps))}
+          {stat("1er GP", String(t.firstGp))}
+        </View>
+      )}
     </View>
   );
   return onPress ? (
     <Pressable accessibilityRole="button" accessibilityLabel="Fiche du circuit" onPress={onPress}>
-      {image}
+      {card}
     </Pressable>
   ) : (
-    image
+    card
   );
 }
+type Track = {
+  w: number;
+  h: number;
+  path: string;
+  start: number[];
+  angle: number;
+  length: number;
+  firstGp: number;
+};

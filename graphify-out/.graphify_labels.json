@@ -11,7 +11,7 @@
   "9": "Installer RaceIQ sur Proxmox",
   "10": "expo",
   "11": "admin.test.mjs",
-  "12": "index.tsx",
+  "12": "design.tsx",
   "13": "tsconfig.json",
   "14": "CLAUDE.md",
   "15": ".claude/CLAUDE.md",
@@ -21,5 +21,13 @@
   "19": "mercato.mjs",
   "20": "accounts.mjs",
   "21": "fail",
-  "22": "account.mjs"
+  "22": "account.mjs",
+  "23": "news.mjs",
+  "24": "notify.test.mjs",
+  "25": "translate.test.mjs",
+  "26": "ads.mjs",
+  "27": "results.mjs",
+  "28": "app/_layout.tsx",
+  "29": "third_party/README.md",
+  "30": "LICENSE.md"
 }

@@ -184,6 +184,9 @@ export default function Settings() {
         Aucune affiliation à Formula 1. Calendrier et résultats fournis par l’API publique Jolpica
         quand le réseau est disponible, sinon données de démonstration.
       </Text>
+      <Text style={s.small}>
+        Tracés des circuits : données ouvertes f1-circuits, © Tomislav Bacinger, licence MIT.
+      </Text>
     </Screen>
   );
 }
