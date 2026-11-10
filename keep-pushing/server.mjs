@@ -24,6 +24,7 @@ import { createPracticeSource, isPractice } from "./src/practice.mjs";
 import * as ads from "./src/ads.mjs";
 import * as mercato from "./src/mercato.mjs";
 import { checkOverride, withOverrides } from "./src/results.mjs";
+import { checkPenalties } from "./src/penalties.mjs";
 import { exactCount, highlights } from "./src/recap.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
@@ -124,7 +125,11 @@ async function roundResults(event) {
 const bySession = (eventId) => {
   const r = withOverrides(rounds.get(eventId)?.results, state.resultOverrides);
   return (
-    r && Object.fromEntries(["Qualifying", "Sprint", "Race"].map((t) => [t, r[`${eventId}:${t}`]]))
+    r && {
+      ...Object.fromEntries(["Qualifying", "Sprint", "Race"].map((t) => [t, r[`${eventId}:${t}`]])),
+      // Pénalités de grille annoncées : grille provisoire des qualifs avant la course.
+      penalties: state.gridPenalties?.[eventId] ?? [],
+    }
   );
 };
 const findEvent = (id) => season?.events.find((e) => e.id === id);
@@ -243,20 +248,23 @@ async function betView(event, user) {
     question: { ...bets.questionOf(event), answer: bets.answerOf(bets.questionOf(event).id, race) },
     // GP où le joker de la saison est déjà posé (s'il y en a un autre).
     jokerOn: jokerEvent(user, event)?.name ?? null,
+    penalties: state.gridPenalties?.[event.id] ?? [],
     mine,
     score: mine && bets.scoreBet(mine, r),
     // Classements réels (ids), pour la colonne « réel » du tableau.
     results: {
       ...Object.fromEntries(
         Object.entries(r)
-          .filter(([, rows]) => rows?.length)
+          .filter(([t, rows]) => t !== "penalties" && rows?.length)
           .map(([t, rows]) => [t, rows.map((x) => x.driverId)]),
       ),
       // Qualifs : grille officielle (pénalités) dès la course publiée.
-      ...(bets.qualiReference(r).grid && {
+      // ou grille provisoire avec les pénalités annoncées, dès la fin des qualifs.
+      ...((bets.qualiReference(r).grid || bets.qualiReference(r).provisional) && {
         Qualifying: bets.qualiReference(r).rows.map((x) => x.driverId),
       }),
       qualiGrid: bets.qualiReference(r).grid,
+      qualiProvisional: !!bets.qualiReference(r).provisional,
       fastest: race?.find((x) => x.fastestLap)?.driverId ?? null,
       dnf: race?.length ? bets.dnfCount(race) : null,
     },
@@ -500,6 +508,7 @@ async function mercatoApi(req, path, auth, adminOnly) {
         .map((r) => mercato.rumorView(r, user.id)),
       score: t[user.id] ?? { seats: 0, rumors: 0, total: 0, exact: 0 },
       admin: community.isAdmin(user, ADMINS),
+      hidden: community.isAdmin(user, ADMINS) ? mercato.hiddenOf(game) : [],
     };
   };
   if (path === "/api/mercato") return [200, view(auth())];
@@ -584,9 +593,16 @@ async function mercatoApi(req, path, auth, adminOnly) {
     await save();
     return [200, view(user)];
   }
+  const removeDriver = path.match(/^\/api\/mercato\/drivers\/([\w-]+)$/);
+  if (removeDriver && req.method === "DELETE") {
+    const user = adminOnly();
+    mercato.removeDriver(game, removeDriver[1]);
+    await save();
+    return [200, view(user)];
+  }
   if (path === "/api/mercato/drivers" && req.method === "POST") {
     const user = adminOnly();
-    mercato.addDriver(game, (await readJson(req))?.name, pool);
+    mercato.addDriver(game, await readJson(req), pool);
     await save();
     return [201, view(user)];
   }
@@ -624,6 +640,8 @@ async function api(req, path) {
         ),
       ),
     ];
+  const penalties = path.match(/^\/api\/penalties\/([\w-]+)$/);
+  if (penalties) return [200, state.gridPenalties?.[penalties[1]] ?? []];
   if (path === "/api/errors" && req.method === "POST") {
     if (!allowReport(req.socket.remoteAddress)) return [429, { error: "Trop de rapports." }];
     const body = await readJson(req);
@@ -747,6 +765,21 @@ async function api(req, path) {
       await save();
     }
     return [200, { parts: bets.partsOf(event), rows: admin.betsOf(state, event.id) }];
+  }
+  const gridPenalties = path.match(/^\/api\/admin\/penalties\/([\w-]+)$/);
+  if (gridPenalties && req.method === "PUT") {
+    adminOnly();
+    const event = findEvent(gridPenalties[1]);
+    if (!event) return [404, { error: "Grand Prix inconnu." }];
+    const list = checkPenalties(
+      (await readJson(req))?.penalties,
+      season.drivers.map((d) => d.id),
+    );
+    state.gridPenalties ??= {};
+    if (list.length) state.gridPenalties[event.id] = list;
+    else delete state.gridPenalties[event.id];
+    await save();
+    return [200, list];
   }
   const fix = path.match(/^\/api\/admin\/results\/([\w-]+:\w+)$/);
   if (fix) {

@@ -8,6 +8,8 @@ import { RecapCard } from "../../src/RecapCard";
 import { Countdown, Hero } from "../../src/design";
 import { useStore } from "../../src/store";
 import {
+  type Penalty,
+  PenaltyList,
   Button,
   DriverPicker,
   Pills,
@@ -31,6 +33,7 @@ type Bet = {
 };
 type PartScore = { slots: number[]; bonus: number; total: number } | null;
 type BetView = {
+  penalties: Penalty[];
   eventId: string;
   parts: Part[];
   closes: Record<string, number>;
@@ -51,6 +54,7 @@ type BetView = {
     fastest: string | null;
     dnf: number | null;
     qualiGrid?: boolean;
+    qualiProvisional?: boolean;
   };
   friends: { pseudo: string; bet: Bet; score: number }[];
 };
@@ -190,8 +194,8 @@ export default function Pronos() {
         <Text style={s.title}>Pronos.</Text>
         <View style={s.lock}>
           <Text style={s.text}>
-            Les pronos passent par le serveur RaceIQ et les vraies données de la saison :
-            ouvrez l’app depuis votre serveur.
+            Les pronos passent par le serveur RaceIQ et les vraies données de la saison : ouvrez
+            l’app depuis votre serveur.
           </Text>
         </View>
       </Screen>
@@ -420,6 +424,10 @@ function Weekend() {
               <Countdown to={nextClose(view, parts, open)} />
             </Hero>
           )}
+          <PenaltyList
+            penalties={view.penalties}
+            hint="Les pronos qualifs sont notés sur la grille de départ : ces pilotes partiront plus loin que leur place en qualifs."
+          />
           <PartsStatus
             view={view}
             parts={parts}
@@ -456,7 +464,9 @@ function Weekend() {
                   {real && part === "quali"
                     ? view.results.qualiGrid
                       ? " · grille officielle (pénalités)"
-                      : " · provisoire, corrigé avec la grille de départ"
+                      : view.results.qualiProvisional
+                        ? " · grille provisoire (pénalités annoncées)"
+                        : " · provisoire, corrigé avec la grille de départ"
                     : ""}
                 </Text>
                 {Array.from({ length: PARTS[part].size }, (_, i) => (

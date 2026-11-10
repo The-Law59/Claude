@@ -3,7 +3,15 @@ import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { PARTS } from "../src/bets.mjs";
 import { useStore } from "../src/store";
-import { Button, Screen, formatDate, useCall, useTheme } from "../src/ui";
+import {
+  Button,
+  type Penalty,
+  PenaltyList,
+  Screen,
+  formatDate,
+  useCall,
+  useTheme,
+} from "../src/ui";
 
 type Part = keyof typeof PARTS;
 type Bet = Partial<Record<Part, string[]>> & {
@@ -19,6 +27,7 @@ type View_ = {
   mine: Bet | null;
   question: { text: string };
   jokerOn: string | null;
+  penalties: Penalty[];
 };
 // Une étape = une question : une place d'un classement, ou un bonus.
 type Step =
@@ -263,6 +272,10 @@ export default function BetWizard() {
     const current = cur.kind === "slot" ? taken[cur.i] : bet.fastest;
     body = (
       <>
+        {/* Qualifs : notées sur la grille de départ, pénalités comprises. */}
+        {cur.kind === "slot" && cur.part === "quali" && (
+          <PenaltyList penalties={view.penalties ?? []} />
+        )}
         {cur.kind === "slot" && (
           <Text style={s.small}>
             {PART_LABEL[cur.part]} · place {cur.i + 1} sur {PARTS[cur.part].size}

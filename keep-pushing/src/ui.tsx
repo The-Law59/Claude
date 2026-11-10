@@ -14,6 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { api, hasApi } from "./api.mjs";
 import { articleVisible, setProtected } from "./model.mjs";
+import { penaltyLabel } from "./penalties.mjs";
 import { DEFAULT_ACCENT, accentFor, glowFor, mix, readableOn, tint } from "./teams.mjs";
 import { type Row, useStore } from "./store";
 
@@ -730,5 +731,30 @@ export function useCall() {
       }
     },
     [prefs.account?.token],
+  );
+}
+
+// Pénalités de grille annoncées pour un GP (moteur, boîte de vitesses…).
+export type Penalty = { driverId: string; kind: string; places?: number; reason: string };
+export function PenaltyList({ penalties, hint }: { penalties: Penalty[]; hint?: string }) {
+  const { c, s, team } = useTheme();
+  const { season } = useStore();
+  if (!penalties.length) return null;
+  return (
+    <View style={[s.card, { borderColor: c.glow }]}>
+      <Text style={s.label}>⚠️ PÉNALITÉS DE GRILLE ANNONCÉES</Text>
+      {penalties.map((p) => {
+        const d = season.drivers.find((x) => x.id === p.driverId);
+        return (
+          <View key={p.driverId} style={[s.rank, { paddingVertical: 8 }]}>
+            <Text style={[s.text, { flex: 1, fontWeight: "700", color: team(d?.teamId ?? "") }]}>
+              {d?.name ?? p.driverId}
+            </Text>
+            <Text style={s.small}>{penaltyLabel(p)}</Text>
+          </View>
+        );
+      })}
+      {!!hint && <Text style={s.small}>{hint}</Text>}
+    </View>
   );
 }

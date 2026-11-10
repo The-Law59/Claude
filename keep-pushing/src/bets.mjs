@@ -5,6 +5,7 @@
 // course, meilleur tour, abandons et question 1 h après le début des qualifs.
 // En plus : une question oui/non par week-end et un joker (points x2) par saison.
 import { fail } from "./errors.mjs";
+import { applyPenalties } from "./penalties.mjs";
 
 export const POINTS = {
   exact: 10,
@@ -152,8 +153,22 @@ export const dnfCount = (rows) =>
 // qualifs (points provisoires). Départ des stands (grille 0) en fin de grille.
 export function qualiReference(results) {
   const race = results.Race;
-  if (!race?.length || !race.some((r) => r.grid > 0))
-    return { rows: results.Qualifying, grid: false };
+  if (!race?.length || !race.some((r) => r.grid > 0)) {
+    // Avant la course : grille provisoire si des pénalités sont annoncées.
+    const quali = results.Qualifying;
+    if (quali?.length && results.penalties?.length) {
+      const order = applyPenalties(
+        [...quali].sort((a, b) => a.position - b.position).map((r) => r.driverId),
+        results.penalties,
+      );
+      return {
+        rows: order.map((driverId, i) => ({ driverId, position: i + 1 })),
+        grid: false,
+        provisional: true,
+      };
+    }
+    return { rows: quali, grid: false };
+  }
   const quali = Object.fromEntries((results.Qualifying ?? []).map((r) => [r.driverId, r.position]));
   const order = [...race].sort(
     (a, b) =>

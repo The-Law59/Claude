@@ -3,8 +3,9 @@ import { Platform, Pressable, Share, Text, TextInput, View } from "react-native"
 import { useFocusEffect, useRouter } from "expo-router";
 import { PARTS } from "../src/bets.mjs";
 import { OVERRIDE_SIZE } from "../src/results.mjs";
+import { PENALTY_REASONS, penaltyLabel } from "../src/penalties.mjs";
 import { useStore } from "../src/store";
-import { Button, Screen, formatDate, useCall, useTheme } from "../src/ui";
+import { Button, type Penalty, Screen, formatDate, useCall, useTheme } from "../src/ui";
 
 type Stats = {
   players: { total: number; active7: number; active30: number; new7: number };
@@ -560,6 +561,7 @@ function BetsAdmin() {
         Un prono saisi ici compte même si la partie est fermée : réservez-le aux joueurs qui vous
         ont donné leur liste avant la fermeture.
       </Text>
+      <PenaltiesAdmin eventId={event.id} />
       <ResultFix eventId={event.id} />
     </View>
   );
@@ -711,6 +713,119 @@ function ResultFix({ eventId }: { eventId: string }) {
           )}
         </View>
       )}
+    </View>
+  );
+}
+
+// --- Pénalités de grille annoncées (moteur, boîte…), affichées aux joueurs
+// avant les qualifs et appliquées à la grille provisoire.
+type Reason = keyof typeof PENALTY_REASONS;
+function PenaltiesAdmin({ eventId }: { eventId: string }) {
+  const { s, c, team } = useTheme();
+  const { season } = useStore();
+  const call = useCall();
+  const [list, setList] = useState<Penalty[]>([]);
+  const [driverId, setDriverId] = useState("");
+  const [kind, setKind] = useState<"places" | "back" | "pitlane">("places");
+  const [places, setPlaces] = useState(10);
+  const [reason, setReason] = useState<Reason>("engine");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    setDriverId("");
+    call(`/api/penalties/${eventId}`)
+      .then(setList)
+      .catch(() => setList([]));
+  }, [eventId, call]);
+  const send = async (next: Penalty[]) => {
+    try {
+      setList(
+        await call(`/api/admin/penalties/${eventId}`, { method: "PUT", body: { penalties: next } }),
+      );
+      setError("");
+      setDriverId("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Enregistrement impossible.");
+    }
+  };
+  const name = (id: string) => season.drivers.find((d) => d.id === id)?.name ?? id;
+  const chip = (label: string, selected: boolean, onPress: () => void) => (
+    <Pressable
+      key={label}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[s.pill, selected && { borderColor: c.accent, backgroundColor: c.soft }]}
+    >
+      <Text style={s.text}>{label}</Text>
+    </Pressable>
+  );
+  return (
+    <View style={{ gap: 8, marginTop: 12 }}>
+      <Text style={s.label}>PÉNALITÉS DE GRILLE ANNONCÉES</Text>
+      <Text style={s.small}>
+        Affichées aux joueurs dès maintenant (pronos, page du GP), puis appliquées à la grille
+        provisoire après les qualifs. La grille officielle les remplace après la course.
+      </Text>
+      {list.map((p) => (
+        <View key={p.driverId} style={[s.rank, { paddingVertical: 6 }]}>
+          <Text style={[s.text, { flex: 1 }]}>
+            {name(p.driverId)} <Text style={s.small}>· {penaltyLabel(p)}</Text>
+          </Text>
+          {chip("Retirer", false, () => send(list.filter((x) => x.driverId !== p.driverId)))}
+        </View>
+      ))}
+      {!list.length && <Text style={s.small}>Aucune pénalité annoncée pour ce GP.</Text>}
+      <Text style={s.label}>AJOUTER</Text>
+      <View style={s.pills}>
+        {season.drivers
+          .filter((d) => !list.some((p) => p.driverId === d.id))
+          .map((d) => (
+            <Pressable
+              key={d.id}
+              accessibilityRole="button"
+              accessibilityState={{ selected: driverId === d.id }}
+              onPress={() => setDriverId(d.id)}
+              style={[
+                s.pill,
+                { borderColor: team(d.teamId) },
+                driverId === d.id && { backgroundColor: c.soft, borderWidth: 2 },
+              ]}
+            >
+              <Text style={[s.text, { color: team(d.teamId) }]}>{d.name.split(" ").at(-1)}</Text>
+            </Pressable>
+          ))}
+      </View>
+      {!!driverId && (
+        <View style={{ gap: 8 }}>
+          <View style={s.pills}>
+            {chip("Recul de places", kind === "places", () => setKind("places"))}
+            {chip("Fond de grille", kind === "back", () => setKind("back"))}
+            {chip("Départ des stands", kind === "pitlane", () => setKind("pitlane"))}
+          </View>
+          {kind === "places" && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Button label="−" secondary onPress={() => setPlaces(Math.max(1, places - 1))} />
+              <Text style={[s.cardTitle, { width: 90, textAlign: "center" }]}>
+                +{places} places
+              </Text>
+              <Button label="+" secondary onPress={() => setPlaces(Math.min(30, places + 1))} />
+              {[3, 5, 10].map((n) => chip(`${n}`, places === n, () => setPlaces(n)))}
+            </View>
+          )}
+          <View style={s.pills}>
+            {(Object.entries(PENALTY_REASONS) as [Reason, string][]).map(([id, label]) =>
+              chip(label, reason === id, () => setReason(id)),
+            )}
+          </View>
+          <Button
+            label={`✅ Ajouter : ${name(driverId)} · ${penaltyLabel({ kind, places, reason, driverId })}`}
+            onPress={() =>
+              send([...list, { driverId, kind, reason, ...(kind === "places" && { places }) }])
+            }
+          />
+        </View>
+      )}
+      {!!error && <Text style={s.error}>{error}</Text>}
     </View>
   );
 }

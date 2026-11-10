@@ -29,7 +29,8 @@ type Rumor = {
 type Game = {
   year: number;
   teams: { id: string; name: string; today: string[] }[];
-  drivers: { id: string; name: string }[];
+  drivers: Driver[];
+  hidden: Driver[];
   mine: Record<string, string[]>;
   official: Official[];
   rumors: Rumor[];
@@ -37,9 +38,25 @@ type Game = {
   admin: boolean;
 };
 type Grid = Record<string, string[]>;
+type Driver = { id: string; name: string; short?: string; category: Category; note: string };
+type Category = "f1" | "f2" | "reserve" | "other";
+const GROUPS: [Category, string][] = [
+  ["f1", "Grille F1 actuelle"],
+  ["f2", "F2"],
+  ["reserve", "Pilotes de réserve"],
+  ["other", "Autres pilotes"],
+];
+// Sous le nom : écurie F2, ou écurie dont il est réserviste.
+const noteOf = (d: Driver) =>
+  d.category === "reserve" ? `réserve ${d.note}` : d.category === "f1" ? "" : d.note;
 type Tab = "grid" | "rumors" | "rank" | "admin";
 
 const last = (name = "") => name.split(" ").at(-1);
+// Nom court d'un pilote : son nom de famille, ou la forme courte connue (« Zhou »).
+const shortOf = (game: { drivers: Driver[] }, id: string) => {
+  const d = game.drivers.find((x) => x.id === id);
+  return d?.short ?? last(d?.name);
+};
 
 // Jeu Mercato : deviner la grille de la saison suivante au fil des rumeurs.
 export default function Mercato() {
@@ -193,9 +210,9 @@ function MyGrid({ game, act }: { game: Game; act: Act }) {
           <View key={t.id} style={[s.card, { borderLeftWidth: 4, borderLeftColor: team(t.id) }]}>
             <Text style={[s.cardTitle, { color: team(t.id) }]}>{t.name}</Text>
             <Text style={s.small}>
-              Aujourd’hui : {t.today.map((d) => last(name(d))).join(", ") || "—"}
+              Aujourd’hui : {t.today.map((d) => shortOf(game, d)).join(", ") || "—"}
               {officials.length
-                ? ` · officiel ${game.year} : ${officials.map((o) => last(name(o.driverId))).join(", ")}`
+                ? ` · officiel ${game.year} : ${officials.map((o) => shortOf(game, o.driverId)).join(", ")}`
                 : ""}
             </Text>
             <View style={{ flexDirection: "row", gap: 8 }}>
@@ -223,7 +240,7 @@ function MyGrid({ game, act }: { game: Game; act: Act }) {
                     }}
                   >
                     <Text style={[s.text, { fontWeight: "700" }]}>
-                      {id ? last(name(id)) : "＋ Choisir"}
+                      {id ? shortOf(game, id) : "＋ Choisir"}
                     </Text>
                     {o && (
                       <Text style={[s.small, { color: good ? c.green : c.error }]}>
@@ -236,30 +253,46 @@ function MyGrid({ game, act }: { game: Game; act: Act }) {
             </View>
             {editing?.teamId === t.id && (
               <View style={{ gap: 8 }}>
-                <View style={s.pills}>
-                  {game.drivers.map((d) => {
-                    const o = officialOf(d.id);
-                    const where = teamOf(d.id);
-                    const here = where === t.id;
-                    return (
-                      <Pressable
-                        key={d.id}
-                        accessibilityRole="button"
-                        accessibilityLabel={d.name}
-                        disabled={!!o || here}
-                        onPress={() => pick(t.id, editing.seat, d.id)}
-                        style={[s.pill, { opacity: o || here ? 0.4 : 1 }]}
-                      >
-                        <Text style={s.text}>{last(d.name)}</Text>
-                        {(o || where) && (
-                          <Text style={s.tiny}>
-                            {o ? "officiel" : here ? "ici" : `chez ${teamName(where!)}`}
-                          </Text>
-                        )}
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                {GROUPS.map(([category, title]) => {
+                  const group = game.drivers.filter((d) => d.category === category);
+                  if (!group.length) return null;
+                  return (
+                    <View key={category} style={{ gap: 4 }}>
+                      <Text style={s.label}>{title.toUpperCase()}</Text>
+                      <View style={s.pills}>
+                        {group.map((d) => {
+                          const o = officialOf(d.id);
+                          const where = teamOf(d.id);
+                          const here = where === t.id;
+                          const note = noteOf(d);
+                          return (
+                            <Pressable
+                              key={d.id}
+                              accessibilityRole="button"
+                              accessibilityLabel={note ? `${d.name}, ${note}` : d.name}
+                              disabled={!!o || here}
+                              onPress={() => pick(t.id, editing.seat, d.id)}
+                              style={[s.pill, { opacity: o || here ? 0.4 : 1 }]}
+                            >
+                              <Text style={s.text}>{d.short ?? last(d.name)}</Text>
+                              {(o || where || note) && (
+                                <Text style={s.tiny}>
+                                  {o
+                                    ? "officiel"
+                                    : here
+                                      ? "ici"
+                                      : where
+                                        ? `chez ${teamName(where)}`
+                                        : note}
+                                </Text>
+                              )}
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                })}
                 {!!list[editing.seat] && (
                   <Button
                     label="Vider ce baquet"
@@ -279,7 +312,7 @@ function MyGrid({ game, act }: { game: Game; act: Act }) {
 // --- Rumeurs : crédible ou bidon ?
 function Rumors({ game, act }: { game: Game; act: Act }) {
   const { s, c, team } = useTheme();
-  const name = (id: string) => last(game.drivers.find((d) => d.id === id)?.name);
+  const name = (id: string) => shortOf(game, id);
   const teamName = (id: string) => game.teams.find((t) => t.id === id)?.name ?? id;
   if (!game.rumors.length)
     return (
@@ -457,6 +490,8 @@ function Admin({ game, act }: { game: Game; act: Act }) {
   const [text, setText] = useState("");
   const [source, setSource] = useState("");
   const [newDriver, setNewDriver] = useState("");
+  const [newNote, setNewNote] = useState("");
+  const [newCategory, setNewCategory] = useState<Category>("f2");
   useEffect(() => {
     call("/api/mercato/suggestions")
       .then(setSuggest)
@@ -497,7 +532,9 @@ function Admin({ game, act }: { game: Game; act: Act }) {
       <View style={s.card}>
         <Text style={s.label}>PILOTE</Text>
         <View style={s.pills}>
-          {game.drivers.map((d) => chip(last(d.name)!, driverId === d.id, () => setDriverId(d.id)))}
+          {game.drivers.map((d) =>
+            chip(d.short ?? last(d.name)!, driverId === d.id, () => setDriverId(d.id)),
+          )}
         </View>
         <Text style={s.label}>ÉCURIE EN {game.year}</Text>
         <View style={s.pills}>
@@ -598,21 +635,80 @@ function Admin({ game, act }: { game: Game; act: Act }) {
         {!game.official.length && <Text style={s.small}>Aucun pour l’instant.</Text>}
       </View>
 
+      <Text style={s.heading}>Pilotes hors F1</Text>
+      <View style={s.card}>
+        <Text style={s.small}>
+          Grille F2 et pilotes de réserve pré-remplis. Retirez ceux qui ne sont plus d’actualité,
+          ajoutez les nouveaux. Un pilote déjà placé par un joueur ne peut pas être retiré.
+        </Text>
+        {(["f2", "reserve", "other"] as Category[]).map((category) => {
+          const group = game.drivers.filter((d) => d.category === category);
+          if (!group.length) return null;
+          return (
+            <View key={category} style={{ gap: 4 }}>
+              <Text style={s.label}>{GROUPS.find((g) => g[0] === category)![1].toUpperCase()}</Text>
+              {group.map((d) => (
+                <View key={d.id} style={[s.rank, { paddingVertical: 6 }]}>
+                  <Text style={[s.text, { flex: 1 }]}>
+                    {d.name}
+                    {d.note ? <Text style={s.small}> · {noteOf(d)}</Text> : null}
+                  </Text>
+                  {chip("Retirer", false, () => act(`/api/mercato/drivers/${d.id}`, "DELETE"))}
+                </View>
+              ))}
+            </View>
+          );
+        })}
+        {game.hidden.length > 0 && (
+          <>
+            <Text style={s.label}>RETIRÉS</Text>
+            <View style={s.pills}>
+              {game.hidden.map((d) =>
+                chip(`↺ ${d.name}`, false, () =>
+                  act("/api/mercato/drivers", "POST", { name: d.name }),
+                ),
+              )}
+            </View>
+          </>
+        )}
+      </View>
       <Text style={s.heading}>Ajouter un pilote</Text>
       <View style={s.card}>
-        <Text style={s.small}>Pour un pilote hors grille actuelle (F2, réserviste, retour…).</Text>
+        <View style={s.pills}>
+          {(
+            [
+              ["f2", "F2"],
+              ["reserve", "Réserve"],
+              ["other", "Autre"],
+            ] as [Category, string][]
+          ).map(([id, label]) => chip(label, newCategory === id, () => setNewCategory(id)))}
+        </View>
         <TextInput
           style={input}
           value={newDriver}
           onChangeText={setNewDriver}
           placeholder="Prénom Nom"
         />
+        <TextInput
+          style={input}
+          value={newNote}
+          onChangeText={setNewNote}
+          placeholder={
+            newCategory === "reserve" ? "Écurie F1 (ex. McLaren)" : "Écurie (ex. Campos Racing)"
+          }
+        />
         <Button
           label="Ajouter"
           onPress={() =>
-            act("/api/mercato/drivers", "POST", { name: newDriver }).then(
-              (ok) => ok && setNewDriver(""),
-            )
+            act("/api/mercato/drivers", "POST", {
+              name: newDriver,
+              category: newCategory,
+              note: newNote,
+            }).then((ok) => {
+              if (!ok) return;
+              setNewDriver("");
+              setNewNote("");
+            })
           }
         />
       </View>

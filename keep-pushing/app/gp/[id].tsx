@@ -6,7 +6,17 @@ import { loadCircuitHistory } from "../../src/jolpica.mjs";
 import { protectWeekend } from "../../src/model.mjs";
 import { loadWeather, localTime } from "../../src/weather.mjs";
 import { useStore } from "../../src/store";
-import { Button, ResultRows, Screen, Toggle, formatDate, useTheme } from "../../src/ui";
+import { api, hasApi } from "../../src/api.mjs";
+import {
+  Button,
+  type Penalty,
+  PenaltyList,
+  ResultRows,
+  Screen,
+  Toggle,
+  formatDate,
+  useTheme,
+} from "../../src/ui";
 
 // Un Grand Prix : ses sessions, ses résultats, sa protection anti-spoil.
 export default function GrandPrix() {
@@ -20,6 +30,7 @@ export default function GrandPrix() {
   const [weather, setWeather] = useState<Weather | null>(null);
   const [weatherError, setWeatherError] = useState(false);
   const [history, setHistory] = useState<{ season: string; driver: string; team: string }[]>([]);
+  const [penalties, setPenalties] = useState<Penalty[]>([]);
   useEffect(() => {
     if (!event) return;
     loadResults(event);
@@ -27,6 +38,10 @@ export default function GrandPrix() {
       loadWeather(event)
         .then(setWeather)
         .catch(() => setWeatherError(true));
+    if (hasApi())
+      api(`/api/penalties/${event.id}`)
+        .then(setPenalties)
+        .catch(() => {});
     if (event.circuitId)
       loadCircuitHistory(event.circuitId)
         // L'édition de cette année est dans les résultats (et l'anti-spoil).
@@ -62,6 +77,7 @@ export default function GrandPrix() {
         {event.location ? ` · ${event.location.locality}, ${event.location.country}` : ""}
       </Text>
       <CircuitCard circuitId={event.circuitId} />
+      {upcoming && <PenaltyList penalties={penalties} />}
       <Text style={s.heading}>Météo du week-end</Text>
       <View style={s.card}>
         {forecast.length > 0 ? (

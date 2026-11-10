@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   addDriver,
+  poolOf,
+  removeDriver,
   addRumor,
   cancelOfficial,
   gameOf,
@@ -166,9 +168,11 @@ test("Mercato : rumeurs, votes et tranchage par l'officialisation", () => {
 
 test("Mercato : pilotes ajoutés et suggestions d'articles", () => {
   const game = gameOf({}, 2028);
-  const d = addDriver(game, "Arvid Lindblad", [{ id: "driver-hamilton", name: "Lewis Hamilton" }]);
-  assert.equal(d.id, "mercato-arvid_lindblad");
-  assert.throws(() => addDriver(game, "arvid lindblad", game.extraDrivers), /existe/);
+  const d = addDriver(game, { name: "Jean Dupont" }, [
+    { id: "driver-hamilton", name: "Lewis Hamilton" },
+  ]);
+  assert.equal(d.id, "mercato-jean_dupont");
+  assert.throws(() => addDriver(game, { name: "jean dupont" }, game.extraDrivers), /existe/);
   const now = 100 * 86400000;
   const articles = [
     {
@@ -202,4 +206,48 @@ test("Mercato : pilotes ajoutés et suggestions d'articles", () => {
     ["a"],
   );
   assert.deepEqual(list[0].teamIds, ["team-cadillac"]);
+});
+
+test("Mercato : F2 et réservistes pré-remplis, sans doublon F1, masquables", () => {
+  const game = gameOf({}, 2028);
+  const f1 = [
+    { id: "driver-hamilton", name: "Lewis Hamilton", team: "Ferrari" },
+    { id: "driver-tsunoda", name: "Yuki Tsunoda", team: "RB F1 Team" },
+  ];
+  let pool = poolOf(game, f1);
+  const camara = pool.find((d) => d.name === "Rafael Câmara");
+  assert.deepEqual(
+    [camara.id, camara.category, camara.note],
+    ["mercato-rafael_camara", "f2", "Invicta Racing"],
+  );
+  assert.equal(pool.find((d) => d.name === "Frederik Vesti").category, "reserve");
+  // Tsunoda roule en F1 : il n'apparaît qu'une fois, en F1.
+  assert.deepEqual(
+    pool.filter((d) => d.name === "Yuki Tsunoda").map((d) => d.category),
+    ["f1"],
+  );
+  // Masquer puis rétablir un pilote pré-rempli.
+  removeDriver(game, "mercato-rafael_camara");
+  assert.equal(
+    poolOf(game, f1).some((d) => d.id === "mercato-rafael_camara"),
+    false,
+  );
+  addDriver(game, { name: "Rafael Câmara" }, poolOf(game, f1));
+  assert.equal(
+    poolOf(game, f1).some((d) => d.id === "mercato-rafael_camara"),
+    true,
+  );
+  // Ajout d'un pilote avec catégorie, puis suppression.
+  addDriver(game, { name: "Nouveau Talent", category: "f2", note: "Campos" }, poolOf(game, f1));
+  pool = poolOf(game, f1);
+  assert.equal(pool.find((d) => d.name === "Nouveau Talent").category, "f2");
+  removeDriver(game, "mercato-nouveau_talent");
+  assert.equal(
+    poolOf(game, f1).some((d) => d.name === "Nouveau Talent"),
+    false,
+  );
+  // Garde-fous : grille F1, pilote déjà choisi par un joueur.
+  assert.throws(() => removeDriver(game, "driver-hamilton"), /grille F1/);
+  game.picks.u1 = { "team-ferrari": [{ driverId: "mercato-frederik_vesti", at: 1 }] };
+  assert.throws(() => removeDriver(game, "mercato-frederik_vesti"), /1 joueur/);
 });

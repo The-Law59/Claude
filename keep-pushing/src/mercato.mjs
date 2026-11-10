@@ -8,6 +8,7 @@
 //   vote « crédible » ou « bidon » ; 3 pts si on a vu juste, +2 contre la majorité.
 import { randomBytes } from "node:crypto";
 import { fail } from "./errors.mjs";
+import { PROSPECTS } from "./mercato.roster.mjs";
 
 export const MERCATO_POINTS = { seat: 10, flair: 10, hunch: 5, vote: 3, against: 2 };
 export const SEATS = 2;
@@ -20,14 +21,40 @@ export function gameOf(state, year) {
     official: [],
     rumors: {},
     extraDrivers: [],
+    hiddenDrivers: [],
   });
 }
 
-// Pilotes jouables : ceux de la saison + ceux ajoutés par les admins (F2, réservistes…).
-export const poolOf = (game, drivers) => [
-  ...drivers.map((d) => ({ id: d.id, name: d.name })),
-  ...game.extraDrivers,
-];
+// Identifiant d'un pilote hors grille F1, à partir de son nom.
+const plain = (t) =>
+  String(t)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+export const driverIdOf = (name) => `mercato-${plain(name).replace(/[^a-z0-9]+/g, "_")}`;
+export const CATEGORIES = ["f1", "f2", "reserve", "other"];
+
+// Pilotes jouables : la grille F1, puis la F2 et les réservistes pré-remplis
+// (sauf ceux masqués par un admin ou déjà en F1), puis ceux ajoutés par les admins.
+export function poolOf(game, drivers) {
+  game.hiddenDrivers ??= [];
+  const f1 = drivers.map((d) => ({ id: d.id, name: d.name, category: "f1", note: d.team ?? "" }));
+  const known = new Set(f1.map((d) => plain(d.name)));
+  const extra = [
+    ...PROSPECTS.map((p) => ({ id: driverIdOf(p.name), ...p })),
+    ...game.extraDrivers.map((d) => ({ category: "other", note: "", ...d })),
+  ].filter((d) => {
+    if (known.has(plain(d.name)) || game.hiddenDrivers.includes(d.id)) return false;
+    known.add(plain(d.name));
+    return true;
+  });
+  return [...f1, ...extra];
+}
+// Pilotes pré-remplis masqués, pour pouvoir les rétablir.
+export const hiddenOf = (game) =>
+  PROSPECTS.map((p) => ({ id: driverIdOf(p.name), ...p })).filter((p) =>
+    (game.hiddenDrivers ?? []).includes(p.id),
+  );
 
 const officialOf = (game, driverId) => game.official.find((o) => o.driverId === driverId);
 
@@ -208,20 +235,39 @@ export function cancelOfficial(game, driverId) {
   if (game.official.length === before) fail(404, "Pas d'officialisation pour ce pilote.");
 }
 
-export function addDriver(game, name, existing) {
-  const n = clean(name, 40);
+export function addDriver(game, body, existing) {
+  const n = clean(body?.name, 40);
   if (n.length < 3) fail(400, "Nom trop court.");
-  const slug = n
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_");
-  const id = `mercato-${slug}`;
-  if (existing.some((d) => d.id === id || d.name.toLowerCase() === n.toLowerCase()))
+  const category = ["f2", "reserve", "other"].includes(body?.category) ? body.category : "other";
+  const id = driverIdOf(n);
+  game.hiddenDrivers ??= [];
+  // Un pilote pré-rempli masqué : on le rétablit.
+  if (game.hiddenDrivers.includes(id)) {
+    game.hiddenDrivers = game.hiddenDrivers.filter((x) => x !== id);
+    return { id, name: n };
+  }
+  if (existing.some((d) => d.id === id || plain(d.name) === plain(n)))
     fail(409, "Ce pilote existe déjà.");
-  const d = { id, name: n };
+  const d = { id, name: n, category, note: clean(body?.note, 40) };
   game.extraDrivers.push(d);
   return d;
+}
+
+// Retire un pilote hors F1 du Mercato : masqué s'il est pré-rempli, supprimé
+// s'il a été ajouté par un admin. Refusé s'il est officialisé ou déjà choisi.
+export function removeDriver(game, id) {
+  if (!id.startsWith("mercato-")) fail(400, "Les pilotes de la grille F1 restent dans le jeu.");
+  if (game.official.some((o) => o.driverId === id)) fail(409, "Ce pilote est officialisé.");
+  const users = Object.values(game.picks).filter((grid) =>
+    Object.values(grid).some((l) => l.some((p) => p.driverId === id)),
+  ).length;
+  if (users) fail(409, `${users} joueur(s) l’ont déjà placé dans leur grille.`);
+  if (game.extraDrivers.some((d) => d.id === id))
+    game.extraDrivers = game.extraDrivers.filter((d) => d.id !== id);
+  else {
+    game.hiddenDrivers ??= [];
+    if (!game.hiddenDrivers.includes(id)) game.hiddenDrivers.push(id);
+  }
 }
 
 // Articles de la veille actus qui parlent de transferts : proposés aux admins.
