@@ -3,7 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { api, hasApi } from "../../src/api.mjs";
 import { RecapCard } from "../../src/RecapCard";
-import { Countdown, Hero, Shortcuts, Thumb, heroText } from "../../src/design";
+import { CircuitCard, Countdown, Hero, Shortcuts, Thumb, heroText } from "../../src/design";
 import {
   articleVisible,
   askFeedback,
@@ -64,6 +64,12 @@ export default function Home() {
           <Text style={heroText}>🎬 Week-end en différé : rien ne sera dévoilé.</Text>
         )}
       </Hero>
+      {season.mode === "live" && (
+        <CircuitCard
+          circuitId={current.circuitId}
+          onPress={() => router.push(`/gp/${current.id}`)}
+        />
+      )}
       <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
         {season.mode === "live" && (
           <View style={{ flexGrow: 1 }}>
@@ -135,8 +141,8 @@ export default function Home() {
         <View style={s.card}>
           <Text style={s.label}>VOTRE AVIS COMPTE</Text>
           <Text style={s.text}>
-            Vous utilisez RaceIQ depuis quelques jours : qu’en pensez-vous ? 2 minutes pour
-            nous aider à l’améliorer.
+            Vous utilisez RaceIQ depuis quelques jours : qu’en pensez-vous ? 2 minutes pour nous
+            aider à l’améliorer.
           </Text>
           <Button label="💬 Donner mon avis" onPress={() => router.push("/feedback")} />
           <Button

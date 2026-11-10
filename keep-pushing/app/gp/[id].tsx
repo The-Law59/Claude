@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { CircuitCard } from "../../src/design";
 import { loadCircuitHistory } from "../../src/jolpica.mjs";
 import { protectWeekend } from "../../src/model.mjs";
 import { loadWeather, localTime } from "../../src/weather.mjs";
@@ -60,6 +61,7 @@ export default function GrandPrix() {
         {event.circuit}
         {event.location ? ` · ${event.location.locality}, ${event.location.country}` : ""}
       </Text>
+      <CircuitCard circuitId={event.circuitId} />
       <Text style={s.heading}>Météo du week-end</Text>
       <View style={s.card}>
         {forecast.length > 0 ? (

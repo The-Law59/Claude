@@ -36,9 +36,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/app/(tabs)/index.tsx": {
-    "mtime": 1794299998.498866,
-    "seen": 1794300076.8614738,
-    "ast_hash": "ee076f16fcc7c3f0c8dfe268d4e51722",
+    "mtime": 1794300570.0502548,
+    "seen": 1794300693.2832706,
+    "ast_hash": "b01434ebe1b935024e231c42990a0a57",
     "semantic_hash": ""
   },
   "keep-pushing/app/(tabs)/live.tsx": {
@@ -126,9 +126,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/app/gp/[id].tsx": {
-    "mtime": 1792008993.331386,
-    "seen": 1793111153.9279747,
-    "ast_hash": "6f52253cd3d65a2ec1f7881256bf4a8b",
+    "mtime": 1794300569.2231035,
+    "seen": 1794300693.2832878,
+    "ast_hash": "28087c8b9b1d33efa2ec832a45127a79",
     "semantic_hash": ""
   },
   "keep-pushing/app/login.tsx": {
@@ -468,9 +468,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/README.md": {
-    "mtime": 1794300014.1874468,
-    "seen": 1794300076.8616028,
-    "ast_hash": "b0f25b32456dda6d4d93b5ea6c9a2606",
+    "mtime": 1794300689.853469,
+    "seen": 1794300693.283371,
+    "ast_hash": "83bbedbf138b7d066429993764043b9f",
     "semantic_hash": ""
   },
   "keep-pushing/VALIDATION.md": {
@@ -534,9 +534,159 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/design.tsx": {
-    "mtime": 1794299998.4967358,
-    "seen": 1794300076.8615425,
-    "ast_hash": "a717fde5fdaf89e26e2e39d4f0426301",
+    "mtime": 1794300639.4804847,
+    "seen": 1794300693.2833273,
+    "ast_hash": "117e37eef5d09716b33c5081b22a3626",
+    "semantic_hash": ""
+  },
+  "keep-pushing/src/circuits.ts": {
+    "mtime": 1794300549.2089145,
+    "seen": 1794300693.2833211,
+    "ast_hash": "7bc312a8aafc0933e220988a1fab561b",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/albert_park.jpg": {
+    "mtime": 1794300537.0262527,
+    "seen": 1794300693.2833765,
+    "ast_hash": "bd9554c532a576765a67b379f01a341c",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/americas.jpg": {
+    "mtime": 1794300542.6342533,
+    "seen": 1794300693.283378,
+    "ast_hash": "fad49bc2ca2a38006e635622055251b5",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/bahrain.jpg": {
+    "mtime": 1794300542.6907787,
+    "seen": 1794300693.2833788,
+    "ast_hash": "660d1db9ea7a783a0a4f77be0df1002e",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/baku.jpg": {
+    "mtime": 1794300542.6382532,
+    "seen": 1794300693.28338,
+    "ast_hash": "9be91dc98fa3ade43b676616ade33655",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/catalunya.jpg": {
+    "mtime": 1794300542.6737196,
+    "seen": 1794300693.2833807,
+    "ast_hash": "c1f00af74bd7a88fb5520fcfded7c6f7",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/hungaroring.jpg": {
+    "mtime": 1794300542.6460207,
+    "seen": 1794300693.2833815,
+    "ast_hash": "fe50b27562b652e2cc4e1c2c277ceefc",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/interlagos.jpg": {
+    "mtime": 1794300542.6208854,
+    "seen": 1794300693.2833824,
+    "ast_hash": "ed47cba95f36eb35f9a5376ba4af09ef",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/jeddah.jpg": {
+    "mtime": 1794300542.666253,
+    "seen": 1794300693.2833834,
+    "ast_hash": "a883eb91e554004fe5d88a25e4fc2a36",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/losail.jpg": {
+    "mtime": 1794300542.6538947,
+    "seen": 1794300693.2834148,
+    "ast_hash": "1d028b638f4544586ff0b7fc430f7504",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/madring.jpg": {
+    "mtime": 1794300542.6803615,
+    "seen": 1794300693.2834177,
+    "ast_hash": "dadda2934a2a6841220968bcb9893db2",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/marina_bay.jpg": {
+    "mtime": 1794300542.6173685,
+    "seen": 1794300693.2834191,
+    "ast_hash": "df678dac6d760964ecab2ce423c5ff51",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/miami.jpg": {
+    "mtime": 1794300542.6574807,
+    "seen": 1794300693.2834203,
+    "ast_hash": "0f83a24425ed650633869b448a2c9133",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/monaco.jpg": {
+    "mtime": 1794300542.6822531,
+    "seen": 1794300693.2834215,
+    "ast_hash": "7bb10b40ebb720e355893922c90676ff",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/monza.jpg": {
+    "mtime": 1794300542.6262531,
+    "seen": 1794300693.2834225,
+    "ast_hash": "f1426d6000d4a0eb7621e970608005ac",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/red_bull_ring.jpg": {
+    "mtime": 1794300542.624152,
+    "seen": 1794300693.2834232,
+    "ast_hash": "c714a8383ef26b595b0427267e16fed7",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/rodriguez.jpg": {
+    "mtime": 1794300542.660807,
+    "seen": 1794300693.2834241,
+    "ast_hash": "daf36ccf90e5fffbd9201d843a8db6d1",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/shanghai.jpg": {
+    "mtime": 1794300542.6705222,
+    "seen": 1794300693.2834253,
+    "ast_hash": "d2544351a10faea6e90a93c7f6996dfd",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/silverstone.jpg": {
+    "mtime": 1794300542.6641126,
+    "seen": 1794300693.2834263,
+    "ast_hash": "2c041db175031974826af8e5f3383b90",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/spa.jpg": {
+    "mtime": 1794300542.6493003,
+    "seen": 1794300693.283427,
+    "ast_hash": "722bbc93491ee1864b13f135cc4db01b",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/suzuka.jpg": {
+    "mtime": 1794300542.6940196,
+    "seen": 1794300693.2834282,
+    "ast_hash": "5b4c3b8f44917c6c9f58cedcbe511977",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/vegas.jpg": {
+    "mtime": 1794300542.6325204,
+    "seen": 1794300693.283429,
+    "ast_hash": "0f31791922c5e0da49c72bb1f88ec686",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/villeneuve.jpg": {
+    "mtime": 1794300542.6769009,
+    "seen": 1794300693.2834299,
+    "ast_hash": "6c4e7aa87ce7a610d1dfe54377634c79",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/yas_marina.jpg": {
+    "mtime": 1794300542.686253,
+    "seen": 1794300693.2834308,
+    "ast_hash": "a42e537970375053c6ca0791747ab279",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/circuits/zandvoort.jpg": {
+    "mtime": 1794300542.6425908,
+    "seen": 1794300693.2834322,
+    "ast_hash": "50702c92520a2afed714dadedfdd5534",
     "semantic_hash": ""
   }
 }

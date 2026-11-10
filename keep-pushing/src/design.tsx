@@ -2,7 +2,8 @@
 // lignes de vitesse, damier, bordure de piste), compte à rebours, badge
 // d'écurie à initiales, vignettes. Dessinés en code : aucune image sous droits.
 import React, { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { circuitCard } from "./circuits";
 import { LinearGradient } from "expo-linear-gradient";
 import { glowFor, initialsFor, mix } from "./teams.mjs";
 import { useTheme } from "./ui";
@@ -203,7 +204,7 @@ export function Countdown({ to }: { to: number }) {
   );
 }
 
-// Badge d'écurie : « RIQ » et initiales, bordure néon à sa couleur.
+// Badge d'écurie : ses initiales, bordure néon à sa couleur (pas de logo officiel).
 export function TeamBadge({
   teamId,
   name,
@@ -237,21 +238,11 @@ export function TeamBadge({
     >
       <Text
         style={{
-          fontSize: size * 0.3,
+          fontSize: initialsFor(teamId, name).length > 3 ? size * 0.24 : size * 0.3,
           fontWeight: "900",
           fontStyle: "italic",
-          color: "#fff",
-          letterSpacing: -1,
-        }}
-      >
-        RIQ
-      </Text>
-      <Text
-        style={{
-          fontSize: Math.max(9, size * 0.14),
-          fontWeight: "800",
           color: glow,
-          letterSpacing: 1,
+          letterSpacing: 0.5,
         }}
       >
         {initialsFor(teamId, name)}
@@ -303,5 +294,40 @@ export function Shortcuts({
         </Pressable>
       ))}
     </View>
+  );
+}
+
+// Carte du circuit (tracé, drapeau, longueur) si on en a une.
+export function CircuitCard({ circuitId, onPress }: { circuitId?: string; onPress?: () => void }) {
+  const { c } = useTheme();
+  const card = circuitCard(circuitId);
+  if (!card) return null;
+  // Cadre au format de l'image (le web ignore aspectRatio sur une Image seule).
+  const image = (
+    <View
+      style={{
+        width: "100%",
+        aspectRatio: card.ratio,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: c.line,
+        overflow: "hidden",
+      }}
+    >
+      <Image
+        source={card.source}
+        accessibilityIgnoresInvertColors
+        accessible={false}
+        resizeMode="cover"
+        style={{ width: "100%", height: "100%" }}
+      />
+    </View>
+  );
+  return onPress ? (
+    <Pressable accessibilityRole="button" accessibilityLabel="Fiche du circuit" onPress={onPress}>
+      {image}
+    </Pressable>
+  ) : (
+    image
   );
 }
