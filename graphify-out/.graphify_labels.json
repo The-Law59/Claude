@@ -1,11 +1,6 @@
 {
-  "0": "useStore",
-  "1": "community.mjs",
-  "2": "store.tsx",
   "3": "game.test.mjs",
-  "4": "server.mjs",
   "5": "package.json",
-  "6": "ref_node_assert",
   "7": "jolpica.mjs",
   "8": "simulator.tsx",
   "9": "Installer RaceIQ sur Proxmox",
@@ -19,11 +14,6 @@
   "17": "install-lxc.sh",
   "18": "VALIDATION.md",
   "19": "fail",
-  "20": "Button",
-  "21": "ui.tsx",
-  "22": "Screen",
-  "23": "mercato.tsx",
-  "24": "useTheme",
   "29": "third_party/README.md",
   "30": "LICENSE.md"
 }

@@ -1,0 +1,17 @@
+{
+  "0": "useTheme",
+  "1": "mercato.mjs",
+  "2": "model.mjs",
+  "4": "api",
+  "6": "translate.test.mjs",
+  "20": "store.tsx",
+  "21": "notify.test.mjs",
+  "22": "news.mjs",
+  "23": "environment",
+  "24": "server.mjs",
+  "25": "add-bet.mjs",
+  "26": "results.mjs",
+  "27": "data.mjs",
+  "28": "app/_layout.tsx",
+  "31": "securite.test.mjs"
+}

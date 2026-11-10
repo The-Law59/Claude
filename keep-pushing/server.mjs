@@ -6,7 +6,7 @@
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
 import { copyFile, readFile, readdir, rm, writeFile, mkdir } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, sep } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { fetchFeeds, toArticle } from "./src/news.mjs";
 import { loadRound, loadSeason } from "./src/jolpica.mjs";
@@ -26,6 +26,7 @@ import * as mercato from "./src/mercato.mjs";
 import { checkOverride, withOverrides } from "./src/results.mjs";
 import { checkPenalties } from "./src/penalties.mjs";
 import { exactCount, highlights } from "./src/recap.mjs";
+import * as securite from "./src/securite.mjs";
 
 const DIST = join(import.meta.dirname, "dist");
 const DATA = join(import.meta.dirname, "data");
@@ -33,6 +34,8 @@ const PORT = Number(process.env.PORT) || 3000;
 const STARTED = Date.now();
 // Pseudos admins (avis, modération du forum) : ADMINS=Quentin,Lucas dans .env.
 const ADMINS = community.parseAdmins(process.env.ADMINS);
+// Proxy de confiance (Nginx Proxy Manager) : TRUST_PROXY=192.168.1.97 dans .env.
+const TRUSTED = securite.parseTrusted(process.env.TRUST_PROXY);
 // Jeu Mercato : grille de cette saison-là (jouée pendant la saison précédente).
 const MERCATO_YEAR = Number(process.env.MERCATO_YEAR) || 2028;
 // Version de l'app : package.app.json dans l'image Docker, sinon package.json.
@@ -189,6 +192,9 @@ process.on("uncaughtException", async (e) => {
   process.exit(1); // Docker relance le conteneur (restart: unless-stopped)
 });
 const allowReport = monitor.rateLimiter();
+// Par IP : 30 connexions ratées par heure, 5 inscriptions par heure.
+const loginFailures = securite.failureCounter(30);
+const allowRegister = monitor.rateLimiter(5);
 
 // Essais libres : fournisseur sous licence configuré dans .env (sinon null).
 const practiceSource = createPracticeSource({
@@ -643,7 +649,7 @@ async function api(req, path) {
   const penalties = path.match(/^\/api\/penalties\/([\w-]+)$/);
   if (penalties) return [200, state.gridPenalties?.[penalties[1]] ?? []];
   if (path === "/api/errors" && req.method === "POST") {
-    if (!allowReport(req.socket.remoteAddress)) return [429, { error: "Trop de rapports." }];
+    if (!allowReport(securite.clientIp(req, TRUSTED))) return [429, { error: "Trop de rapports." }];
     const body = await readJson(req);
     reportError({ ...body, source: "app" });
     return [201, { ok: true }];
@@ -818,10 +824,35 @@ async function api(req, path) {
     return [200, { filename: `raceiq-${exportRoute[1]}-${day}.csv`, csv }];
   }
   const changed = async (result) => (await save(), result);
-  if (path === "/api/register" && req.method === "POST")
-    return [201, await changed(await accounts.register(state, await readJson(req)))];
-  if (path === "/api/login" && req.method === "POST")
-    return [200, await changed(await accounts.login(state, await readJson(req), { failures }))];
+  if (path === "/api/register" && req.method === "POST") {
+    const ip = securite.clientIp(req, TRUSTED);
+    if (!allowRegister(ip)) {
+      securite.logSecurity("register.blocked", ip);
+      return [429, { error: "Trop d'inscriptions : réessayez plus tard." }];
+    }
+    const body = await readJson(req);
+    if (securite.adminPseudoTaken(ADMINS, body?.pseudo))
+      return [409, { error: "Ce pseudo est déjà pris." }];
+    return [201, await changed(await accounts.register(state, body))];
+  }
+  if (path === "/api/login" && req.method === "POST") {
+    const ip = securite.clientIp(req, TRUSTED);
+    if (loginFailures.blocked(ip)) {
+      securite.logSecurity("auth.blocked", ip);
+      return [429, { error: "Trop d'essais : réessayez plus tard." }];
+    }
+    try {
+      // Blocage par pseudo ET par IP : un inconnu ne peut plus bloquer le
+      // compte d'un autre joueur (ou d'un admin) en ratant son mot de passe.
+      return [200, await changed(await accounts.login(state, await readJson(req), { failures, ip }))];
+    } catch (e) {
+      if (e instanceof accounts.GameError && (e.status === 401 || e.status === 429)) {
+        loginFailures.fail(ip);
+        securite.logSecurity(e.status === 401 ? "auth.fail" : "auth.blocked", ip);
+      }
+      throw e;
+    }
+  }
   if (path === "/api/logout" && req.method === "POST") {
     accounts.logout(state, req.headers.authorization);
     return [200, await changed({})];
@@ -831,8 +862,13 @@ async function api(req, path) {
     await account.changePassword(state, auth(), await readJson(req), req.headers.authorization);
     return [200, await changed({ ok: true })];
   }
-  if (path === "/api/account/pseudo" && req.method === "POST")
-    return [200, await changed(await account.changePseudo(state, auth(), await readJson(req)))];
+  if (path === "/api/account/pseudo" && req.method === "POST") {
+    const user = auth();
+    const body = await readJson(req);
+    if (securite.adminPseudoTaken(ADMINS, body?.pseudo, user))
+      return [409, { error: "Ce pseudo est déjà pris." }];
+    return [200, await changed(await account.changePseudo(state, user, body))];
+  }
   if (path === "/api/account/export") return [200, account.exportData(state, auth())];
   if (path === "/api/account/delete" && req.method === "POST") {
     await account.deleteAccount(state, auth(), await readJson(req));
@@ -1040,8 +1076,11 @@ async function api(req, path) {
 }
 
 createServer(async (req, res) => {
-  const path = decodeURIComponent(new URL(req.url, "http://x").pathname);
+  let path = "?";
   try {
+    // Dans le try : une adresse mal encodée (« /%E0%A4%A ») levait une erreur
+    // jamais rattrapée, la requête restait sans réponse.
+    path = decodeURIComponent(new URL(req.url, "http://x").pathname);
     if (path.startsWith("/api/")) {
       const [status, body] =
         req.method === "OPTIONS"
@@ -1062,7 +1101,8 @@ createServer(async (req, res) => {
     // normalize + préfixe : empêche de sortir de dist/ avec « .. ».
     const file = normalize(join(DIST, path));
     // Chemin sans extension = route de l'app : on renvoie index.html.
-    const target = file.startsWith(DIST) && extname(file) ? file : join(DIST, "index.html");
+    // Préfixe avec le séparateur : « dist-old/ » ne passe pas pour « dist/ ».
+    const target = file.startsWith(DIST + sep) && extname(file) ? file : join(DIST, "index.html");
     const body = await readFile(target).catch(() => null);
     if (!body) {
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
@@ -1071,7 +1111,9 @@ createServer(async (req, res) => {
     res.writeHead(200, { "content-type": TYPES[extname(target)] ?? "application/octet-stream" });
     res.end(body);
   } catch (e) {
-    res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
-    res.end(`Erreur : ${e.message}`);
+    // Adresse mal formée : erreur du visiteur. Aucun détail interne renvoyé.
+    const bad = e instanceof URIError || e instanceof TypeError;
+    if (!res.headersSent) res.writeHead(bad ? 400 : 502, { "content-type": "text/plain; charset=utf-8" });
+    res.end(bad ? "Requête invalide" : "Erreur");
   }
 }).listen(PORT, () => console.log(`RaceIQ web sur http://0.0.0.0:${PORT}`));

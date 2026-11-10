@@ -67,12 +67,14 @@ export async function register(state, body, rand = randomBytes) {
 }
 
 // failures : Map en mémoire (pseudo -> { count, until }) contre les essais en rafale.
-export async function login(state, body, { failures, now = Date.now(), rand = randomBytes }) {
+// ip : le blocage vise le couple pseudo + IP, pour qu'un inconnu ne puisse pas
+// bloquer le compte d'un autre joueur en ratant exprès son mot de passe.
+export async function login(state, body, { failures, ip = "", now = Date.now(), rand = randomBytes }) {
   const { pseudo, password } = credentials(body);
-  const key = keyOf(pseudo);
+  const key = `${keyOf(pseudo)}|${ip}`; // clé du blocage
   const f = failures.get(key);
   if (f && f.until > now) fail(429, "Trop d'essais : réessayez dans 15 minutes.");
-  const user = Object.values(state.users).find((u) => keyOf(u.pseudo) === key);
+  const user = Object.values(state.users).find((u) => keyOf(u.pseudo) === keyOf(pseudo));
   const hash = await hashPassword(password, user?.salt ?? "absent");
   if (!user || !timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(user.hash, "hex"))) {
     const recent = f && now - f.first < BLOCK.ms;
