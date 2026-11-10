@@ -1,4 +1,4 @@
-# Version web de Keep Pushing : export Expo + server.mjs (veille actualités, traduction).
+# Version web de RaceIQ : export Expo + server.mjs (veille actualités, traduction).
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./

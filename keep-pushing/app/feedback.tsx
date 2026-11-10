@@ -55,7 +55,7 @@ export default function Feedback() {
         {back}
         <Text style={s.title}>Votre avis.</Text>
         <Text style={s.text}>
-          Connectez-vous pour nous dire ce que vous pensez de Keep Pushing : un compte évite les
+          Connectez-vous pour nous dire ce que vous pensez de RaceIQ : un compte évite les
           avis en double.
         </Text>
         {hasApi() && <Button label="Se connecter" onPress={() => router.push("/login")} />}
@@ -139,7 +139,7 @@ export default function Feedback() {
             onChangeText={setIdeas}
             maxLength={1000}
             multiline
-            placeholder="Ce que vous aimeriez voir dans Keep Pushing"
+            placeholder="Ce que vous aimeriez voir dans RaceIQ"
           />
           {!!error && <Text style={s.error}>{error}</Text>}
           <Button

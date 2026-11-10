@@ -185,7 +185,7 @@ export function Screen({
         </Pressable>
         <View style={{ flex: 1, alignItems: "center" }}>
           <Text style={s.brand} accessibilityRole="header">
-            Keep <Text style={{ color: c.glow }}>Pushing.</Text>
+            Race<Text style={{ color: c.glow }}>IQ</Text>
           </Text>
         </View>
         <View style={{ flexDirection: "row", gap: 8, minWidth: 46, justifyContent: "flex-end" }}>
@@ -310,7 +310,7 @@ function Menu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
           <ScrollView contentContainerStyle={{ padding: 20, gap: 4 }}>
             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
               <Text style={[s.brand, { flex: 1 }]}>
-                Keep <Text style={{ color: c.accent }}>Pushing.</Text>
+                Race<Text style={{ color: c.accent }}>IQ</Text>
               </Text>
               <Pressable
                 accessibilityRole="button"
@@ -433,7 +433,7 @@ export function ResultRows({ sessionId }: { sessionId: string }) {
         : practice
           ? extraState === "loading"
             ? "Chargement des résultats…"
-            : "Résultats des essais pas encore disponibles dans Keep Pushing : notre source de données actuelle ne les publie pas. Ils arriveront avec une source officielle."
+            : "Résultats des essais pas encore disponibles dans RaceIQ : notre source de données actuelle ne les publie pas. Ils arriveront avec une source officielle."
           : "Chargement des résultats…";
     return (
       <View style={s.card}>

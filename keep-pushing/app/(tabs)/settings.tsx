@@ -179,7 +179,7 @@ export default function Settings() {
           {notice}
         </Text>
       )}
-      <Text style={s.heading}>Keep Pushing · 0.2</Text>
+      <Text style={s.heading}>RaceIQ · 0.2</Text>
       <Text style={s.small}>
         Aucune affiliation à Formula 1. Calendrier et résultats fournis par l’API publique Jolpica
         quand le réseau est disponible, sinon données de démonstration.

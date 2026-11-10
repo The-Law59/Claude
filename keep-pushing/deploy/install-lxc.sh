@@ -1,6 +1,6 @@
 #!/bin/bash
 # À lancer DANS un conteneur LXC Debian 12 de Proxmox, en root.
-# Installe Docker, récupère Keep Pushing et le lance sur le port 3000.
+# Installe Docker, récupère RaceIQ et le lance sur le port 3000.
 # Relancer le script met l'app à jour.
 set -euo pipefail
 REPO="${REPO:-https://github.com/The-Law59/Claude.git}"
@@ -17,4 +17,4 @@ else
 fi
 cd "$DIR/keep-pushing"
 docker compose up -d --build
-echo "Keep Pushing tourne sur http://$(hostname -I | awk '{print $1}'):3000"
+echo "RaceIQ tourne sur http://$(hostname -I | awk '{print $1}'):3000"

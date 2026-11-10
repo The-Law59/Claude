@@ -135,7 +135,7 @@ export default function Home() {
         <View style={s.card}>
           <Text style={s.label}>VOTRE AVIS COMPTE</Text>
           <Text style={s.text}>
-            Vous utilisez Keep Pushing depuis quelques jours : qu’en pensez-vous ? 2 minutes pour
+            Vous utilisez RaceIQ depuis quelques jours : qu’en pensez-vous ? 2 minutes pour
             nous aider à l’améliorer.
           </Text>
           <Button label="💬 Donner mon avis" onPress={() => router.push("/feedback")} />

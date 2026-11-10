@@ -1,4 +1,9 @@
-# Installer Keep Pushing sur Proxmox
+# Installer RaceIQ sur Proxmox
+
+L'appli s'appelait Keep Pushing : les dossiers (`/opt/keep-pushing`), la
+branche et le service Docker (`keep-pushing`) gardent ce nom technique, pour
+ne rien casser sur un serveur déjà installé. Tout ce que voient les joueurs
+s'appelle RaceIQ.
 
 La version web tourne dans un petit conteneur LXC. Les actualités passent par
 `server.mjs`, qui relaie les flux RSS que le navigateur bloquerait.

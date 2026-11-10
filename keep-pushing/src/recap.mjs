@@ -33,7 +33,7 @@ export const exactCount = (score) =>
 // r : réponse de /api/recap ; url : adresse de l'app à partager.
 export function shareText(r, url) {
   const lines = [
-    `🏁 Keep Pushing · ${r.event}`,
+    `🏁 RaceIQ · ${r.event}`,
     `${r.points} pts${r.joker ? " (joker ×2 !)" : ""}${r.best ? ` · meilleur score : ${r.best.pseudo} (${r.best.points})` : ""}`,
   ];
   if (r.exact)

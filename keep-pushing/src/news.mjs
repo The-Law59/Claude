@@ -194,7 +194,7 @@ export async function fetchFeeds(fetchFn = fetch) {
   const feeds = await Promise.allSettled(
     SOURCES.map(async (feed) => {
       const res = await timedFetch(fetchFn, feed.url, 10000, {
-        headers: { "user-agent": "KeepPushing/0.3 (veille F1)" },
+        headers: { "user-agent": "RaceIQ/0.3 (veille F1)" },
       });
       if (!res.ok) throw new Error(`${feed.name} ${res.status}`);
       return parseRss(await res.text(), feed);

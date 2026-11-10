@@ -70,7 +70,7 @@ export default function Forum() {
         <Text style={s.title}>Forum.</Text>
         <View style={s.lock}>
           <Text style={s.text}>
-            Le forum passe par le serveur Keep Pushing : ouvrez l’app depuis votre serveur.
+            Le forum passe par le serveur RaceIQ : ouvrez l’app depuis votre serveur.
           </Text>
         </View>
       </Screen>
@@ -133,7 +133,7 @@ export default function Forum() {
       }
     >
       <Text style={s.title}>Forum.</Text>
-      <Text style={s.subtitle}>La communauté F1 de Keep Pushing.</Text>
+      <Text style={s.subtitle}>La communauté de RaceIQ.</Text>
       <Pills
         options={[
           ["trending", "🔥 Tendances"],

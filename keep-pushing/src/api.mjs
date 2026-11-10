@@ -1,4 +1,4 @@
-// Appels au serveur Keep Pushing : même origine dans le navigateur, ou
+// Appels au serveur RaceIQ : même origine dans le navigateur, ou
 // EXPO_PUBLIC_API_URL sur mobile. Sans serveur, les fonctions qui en
 // dépendent (traduction, pronostics) sont masquées.
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";

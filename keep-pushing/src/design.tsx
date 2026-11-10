@@ -203,7 +203,7 @@ export function Countdown({ to }: { to: number }) {
   );
 }
 
-// Badge d'écurie : « KP » et initiales, bordure néon à sa couleur.
+// Badge d'écurie : « RIQ » et initiales, bordure néon à sa couleur.
 export function TeamBadge({
   teamId,
   name,
@@ -244,7 +244,7 @@ export function TeamBadge({
           letterSpacing: -1,
         }}
       >
-        KP
+        RIQ
       </Text>
       <Text
         style={{

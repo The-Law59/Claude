@@ -115,7 +115,7 @@ export function reminderPlan(sessions, prefs, now = Date.now(), name = "") {
     .map((s) => ({
       id: s.id,
       title: `${s.label} dans ${prefs.reminderMinutes} minutes`,
-      body: `Keep Pushing · ${name}`,
+      body: `RaceIQ · ${name}`,
       date: new Date(s.startsAt).getTime() - prefs.reminderMinutes * 60000,
     }))
     .filter((x) => x.date > now);

@@ -60,7 +60,7 @@ export default function Account() {
       const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
       const a = document.createElement("a");
       a.href = url;
-      a.download = `keep-pushing-${prefs.account!.pseudo}.json`;
+      a.download = `raceiq-${prefs.account!.pseudo}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } else await Share.share({ message: text });
@@ -144,7 +144,7 @@ export default function Account() {
       <Text style={s.heading}>Mes données</Text>
       <View style={s.card}>
         <Text style={s.text}>
-          Récupérez tout ce que Keep Pushing garde sur vous : profil, amis, paris, ligues, messages,
+          Récupérez tout ce que RaceIQ garde sur vous : profil, amis, paris, ligues, messages,
           avis.
         </Text>
         <Button label="Télécharger mes données" secondary onPress={exportData} />

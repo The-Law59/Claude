@@ -190,7 +190,7 @@ export default function Pronos() {
         <Text style={s.title}>Pronos.</Text>
         <View style={s.lock}>
           <Text style={s.text}>
-            Les pronos passent par le serveur Keep Pushing et les vraies données de la saison :
+            Les pronos passent par le serveur RaceIQ et les vraies données de la saison :
             ouvrez l’app depuis votre serveur.
           </Text>
         </View>

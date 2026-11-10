@@ -1,4 +1,4 @@
-// Serveur de Keep Pushing (version web + API pour l'app) :
+// Serveur de RaceIQ (version web + API pour l'app) :
 // - export statique de l'app (dist/) ;
 // - /api/news.json : veille actualités fusionnée, traduite en français si
 //   ANTHROPIC_API_KEY est défini (les navigateurs ne peuvent pas lire les flux) ;
@@ -782,7 +782,7 @@ async function api(req, path) {
     const csv = admin.exportCsv(state, exportRoute[1], { points: (id) => totals[id] ?? 0 });
     if (csv === null) return [404, { error: "Export inconnu." }];
     const day = new Date().toISOString().slice(0, 10);
-    return [200, { filename: `keep-pushing-${exportRoute[1]}-${day}.csv`, csv }];
+    return [200, { filename: `raceiq-${exportRoute[1]}-${day}.csv`, csv }];
   }
   const changed = async (result) => (await save(), result);
   if (path === "/api/register" && req.method === "POST")
@@ -1041,4 +1041,4 @@ createServer(async (req, res) => {
     res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
     res.end(`Erreur : ${e.message}`);
   }
-}).listen(PORT, () => console.log(`Keep Pushing web sur http://0.0.0.0:${PORT}`));
+}).listen(PORT, () => console.log(`RaceIQ web sur http://0.0.0.0:${PORT}`));

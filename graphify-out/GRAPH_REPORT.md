@@ -1,7 +1,7 @@
-# Graph Report - Claude  (2026-11-07)
+# Graph Report - Claude  (2026-11-10)
 
 ## Corpus Check
-- 89 files · ~62,876 words
+- 89 files · ~62,948 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 4 file(s) not represented in the graph (top: (none) 4)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `26b281d6`
+- Built from commit: `a8490d16`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -25,7 +25,7 @@
 - ref_node_assert
 - jolpica.mjs
 - simulator.tsx
-- Installer Keep Pushing sur Proxmox
+- Installer RaceIQ sur Proxmox
 - expo
 - admin.test.mjs
 - design.tsx
@@ -103,9 +103,9 @@ Nodes (30): additionsOf(), at(), driverKey(), eventId(), getJson(), LABELS, load
 Cohesion: 0.23
 Nodes (17): Driver, Picks, Race, Simulator(), contenders(), defaultPicks(), maxLeft(), pointsFor() (+9 more)
 
-### Community 9 - "Installer Keep Pushing sur Proxmox"
+### Community 9 - "Installer RaceIQ sur Proxmox"
 Cohesion: 0.12
-Nodes (14): 1. Créer le conteneur (interface Proxmox), 2. Installer l'app (dans la console du conteneur), 3. Traduction des actualités anglaises (facultatif), 4. Sur le téléphone, Essais libres (fournisseur à choisir), Installer Keep Pushing sur Proxmox, Pubs pour regagner le joker (après la sortie sur les stores), Surveillance (+6 more)
+Nodes (14): 1. Créer le conteneur (interface Proxmox), 2. Installer l'app (dans la console du conteneur), 3. Traduction des actualités anglaises (facultatif), 4. Sur le téléphone, Essais libres (fournisseur à choisir), Installer RaceIQ sur Proxmox, Pubs pour regagner le joker (après la sortie sur les stores), Surveillance (+6 more)
 
 ### Community 10 - "expo"
 Cohesion: 0.14
@@ -139,7 +139,7 @@ Nodes (24): BetRow, EXPORTS, Part, PART_LABEL, Player, SESSION_LABEL, SessionTyp
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `useTheme()` connect `useTheme` to `store.tsx`, `simulator.tsx`, `Installer Keep Pushing sur Proxmox`, `design.tsx`, `admin.tsx`?**
+- **Why does `useTheme()` connect `useTheme` to `store.tsx`, `simulator.tsx`, `Installer RaceIQ sur Proxmox`, `design.tsx`, `admin.tsx`?**
   _High betweenness centrality (0.066) - this node is a cross-community bridge._
 - **What connects `expo`, `expo-constants`, `expo-linking` to the rest of the system?**
   _10 weakly-connected nodes found - possible documentation gaps or missing edges._

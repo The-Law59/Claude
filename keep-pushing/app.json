@@ -1,22 +1,22 @@
 {
   "expo": {
-    "name": "Keep Pushing",
-    "slug": "keep-pushing",
+    "name": "RaceIQ",
+    "slug": "raceiq",
     "version": "0.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.keeppushing.mobile"
+      "bundleIdentifier": "com.raceiq.mobile"
     },
     "android": {
-      "package": "com.keeppushing.mobile"
+      "package": "com.raceiq.mobile"
     },
     "plugins": [
       "expo-notifications",
       "expo-status-bar",
       "expo-router"
     ],
-    "scheme": "keeppushing"
+    "scheme": "raceiq"
   }
 }

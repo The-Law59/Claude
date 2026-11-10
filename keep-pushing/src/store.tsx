@@ -15,7 +15,9 @@ import {
   syncedPart,
 } from "./model.mjs";
 
-const KEY = "keep-pushing.preferences.v1";
+const KEY = "raceiq.preferences.v1";
+// Clé de l'ancien nom de l'appli (Keep Pushing) : relue une fois, puis migrée.
+const LEGACY_KEY = "keep-pushing.preferences.v1";
 export type Prefs = {
   version: number;
   favorites: string[];
@@ -136,10 +138,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let alive = true;
     Promise.all([
-      AsyncStorage.getItem(KEY).catch(() => {
-        setError("Impossible de lire vos préférences.");
-        return null;
-      }),
+      AsyncStorage.getItem(KEY)
+        .then((v) => v ?? AsyncStorage.getItem(LEGACY_KEY))
+        .catch(() => {
+          setError("Impossible de lire vos préférences.");
+          return null;
+        }),
       // shortcut: sans réseau on retombe sur la démo, pas de cache hors ligne ; à ajouter si besoin.
       loadSeason().catch(() => demoSeason) as Promise<Season>,
       loadNews().catch(() => null),
@@ -234,7 +238,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           const latest = box.items.find((n) => !n.read);
           const stamp = latest && `${latest.id}:${latest.count}`;
           if (latest && seen.current !== null && stamp !== seen.current)
-            notifyNow("Keep Pushing", noticeText(latest, prefsRef.current));
+            notifyNow("RaceIQ", noticeText(latest, prefsRef.current));
           seen.current = stamp ?? "";
         })
         .catch(() => {});
