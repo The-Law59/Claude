@@ -25,6 +25,7 @@ import * as ads from "./src/ads.mjs";
 import * as mercato from "./src/mercato.mjs";
 import { checkOverride, withOverrides } from "./src/results.mjs";
 import { checkPenalties } from "./src/penalties.mjs";
+import { racingDrivers } from "./src/model.mjs";
 import { exactCount, highlights } from "./src/recap.mjs";
 import * as securite from "./src/securite.mjs";
 
@@ -496,7 +497,9 @@ async function mercatoApi(req, path, auth, adminOnly) {
       teams: season.teams.map((team) => ({
         id: team.id,
         name: team.name,
-        today: season.drivers.filter((d) => d.teamId === team.id).map((d) => d.id),
+        today: racingDrivers(season.drivers)
+          .filter((d) => d.teamId === team.id)
+          .map((d) => d.id),
       })),
       drivers: pool,
       mine: Object.fromEntries(
@@ -779,7 +782,7 @@ async function api(req, path) {
     if (!event) return [404, { error: "Grand Prix inconnu." }];
     const list = checkPenalties(
       (await readJson(req))?.penalties,
-      season.drivers.map((d) => d.id),
+      racingDrivers(season.drivers).map((d) => d.id),
     );
     state.gridPenalties ??= {};
     if (list.length) state.gridPenalties[event.id] = list;
@@ -844,7 +847,10 @@ async function api(req, path) {
     try {
       // Blocage par pseudo ET par IP : un inconnu ne peut plus bloquer le
       // compte d'un autre joueur (ou d'un admin) en ratant son mot de passe.
-      return [200, await changed(await accounts.login(state, await readJson(req), { failures, ip }))];
+      return [
+        200,
+        await changed(await accounts.login(state, await readJson(req), { failures, ip })),
+      ];
     } catch (e) {
       if (e instanceof accounts.GameError && (e.status === 401 || e.status === 429)) {
         loginFailures.fail(ip);
@@ -1061,7 +1067,7 @@ async function api(req, path) {
         event,
         state.bets[event.id][user.id],
         body,
-        (season?.drivers ?? []).map((d) => d.id),
+        racingDrivers(season?.drivers ?? []).map((d) => d.id),
         Date.now(),
         prevRace(event),
       );
@@ -1113,7 +1119,8 @@ createServer(async (req, res) => {
   } catch (e) {
     // Adresse mal formée : erreur du visiteur. Aucun détail interne renvoyé.
     const bad = e instanceof URIError || e instanceof TypeError;
-    if (!res.headersSent) res.writeHead(bad ? 400 : 502, { "content-type": "text/plain; charset=utf-8" });
+    if (!res.headersSent)
+      res.writeHead(bad ? 400 : 502, { "content-type": "text/plain; charset=utf-8" });
     res.end(bad ? "Requête invalide" : "Erreur");
   }
 }).listen(PORT, () => console.log(`RaceIQ web sur http://0.0.0.0:${PORT}`));

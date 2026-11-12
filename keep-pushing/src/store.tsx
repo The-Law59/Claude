@@ -66,7 +66,15 @@ export type Season = {
   mode: string;
   events: Event[];
   results: Record<string, Row[]>;
-  drivers: { id: string; name: string; team: string; teamId: string; points: number }[];
+  // active: false pour un pilote remplacé jusqu'à la fin de saison (hors pronos).
+  drivers: {
+    id: string;
+    name: string;
+    team: string;
+    teamId: string;
+    points: number;
+    active?: boolean;
+  }[];
   teams: { id: string; name: string; points: number }[];
   articles: Article[];
 };

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Platform, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { PARTS } from "../src/bets.mjs";
+import { racingDrivers } from "../src/model.mjs";
 import { OVERRIDE_SIZE } from "../src/results.mjs";
 import { PENALTY_REASONS, penaltyLabel } from "../src/penalties.mjs";
 import { useStore } from "../src/store";
@@ -504,7 +505,7 @@ function BetsAdmin() {
                     {edit.ids.map((id, i) => `${i + 1}. ${last(id)}`).join("  ") || "—"}
                   </Text>
                   <View style={s.pills}>
-                    {season.drivers.map((d) => {
+                    {racingDrivers(season.drivers).map((d) => {
                       const at = edit.ids.indexOf(d.id);
                       return (
                         <Pressable
@@ -777,7 +778,7 @@ function PenaltiesAdmin({ eventId }: { eventId: string }) {
       {!list.length && <Text style={s.small}>Aucune pénalité annoncée pour ce GP.</Text>}
       <Text style={s.label}>AJOUTER</Text>
       <View style={s.pills}>
-        {season.drivers
+        {racingDrivers(season.drivers)
           .filter((d) => !list.some((p) => p.driverId === d.id))
           .map((d) => (
             <Pressable

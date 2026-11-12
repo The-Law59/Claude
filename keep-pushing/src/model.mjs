@@ -177,11 +177,21 @@ export function setMine(prefs, key, id) {
   };
 }
 // Coéquipier : même écurie, celui qui a le plus de points (changements de baquet).
+// Pilotes qui courent encore cette saison (choix des pronos, coéquipier).
+/**
+ * @template {{ active?: boolean }} T
+ * @param {T[]} drivers
+ * @returns {T[]}
+ */
+export const racingDrivers = (drivers) => drivers.filter((d) => d.active !== false);
+
 export const teammateOf = (drivers, driverId) => {
   const me = drivers.find((d) => d.id === driverId);
   return drivers
     .filter((d) => d.id !== driverId && me && d.teamId === me.teamId)
-    .sort((a, b) => b.points - a.points)[0];
+    .sort(
+      (a, b) => Number(b.active !== false) - Number(a.active !== false) || b.points - a.points,
+    )[0];
 };
 
 // Duel : face-à-face GP par GP sur les week-ends courus par les deux ;

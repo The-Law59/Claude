@@ -3,6 +3,7 @@ import { Animated, Pressable, Text, TextInput, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { api, hasApi } from "../../src/api.mjs";
 import { PARTS, POINTS } from "../../src/bets.mjs";
+import { racingDrivers } from "../../src/model.mjs";
 import { CHAMPION_POINTS } from "../../src/seasons.mjs";
 import { RecapCard } from "../../src/RecapCard";
 import { Countdown, Hero } from "../../src/design";
@@ -316,7 +317,7 @@ function Weekend() {
 
   // Pré-remplissage : sources possibles pour une partie, de la plus utile à
   // la moins utile. Chaque source donne une liste complète et sans doublon.
-  const standings = season.drivers.map((d) => d.id);
+  const standings = racingDrivers(season.drivers).map((d) => d.id);
   const complete = (list: string[] | undefined, size: number) => {
     if (!list?.length) return null;
     const known = list.filter((id) => standings.includes(id));

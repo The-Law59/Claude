@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { PARTS } from "../src/bets.mjs";
+import { racingDrivers } from "../src/model.mjs";
 import { useStore } from "../src/store";
 import {
   Button,
@@ -143,7 +144,9 @@ export default function BetWizard() {
   // Compléter les places restantes d'un classement avec l'ordre du championnat.
   const fillRest = (part: Part) => {
     const list = [...(bet[part] ?? Array(PARTS[part].size).fill(""))];
-    const rest = season.drivers.map((d) => d.id).filter((id) => !list.includes(id));
+    const rest = racingDrivers(season.drivers)
+      .map((d) => d.id)
+      .filter((id) => !list.includes(id));
     const filled = list.map((x) => x || rest.shift()!);
     setBet({ ...bet, [part]: filled });
     // On saute à la fin de ce classement.
@@ -288,7 +291,7 @@ export default function BetWizard() {
           </Text>
         )}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-          {season.drivers.map((d) => {
+          {racingDrivers(season.drivers).map((d) => {
             const placed = taken.indexOf(d.id);
             const mine = d.id === current;
             // Déjà placé ailleurs dans ce classement : grisé et désactivé.

@@ -212,3 +212,31 @@ test("Remplaçant annoncé : pariable avant sa première course, même id ensuit
   });
   assert.equal(out[`${event.id}:Race`][0].driverId, "driver-hirakawa");
 });
+
+test("Pilote remplacé jusqu'à la fin de saison : gardé au classement, retiré des pronos", async () => {
+  const { racingDrivers, teammateOf } = await import("../src/model.mjs");
+  const ocon = { driverId: "ocon", givenName: "Esteban", familyName: "Ocon" };
+  const bearman = { driverId: "bearman", givenName: "Oliver", familyName: "Bearman" };
+  const camara = { driverId: "rafael_camara", givenName: "Rafael", familyName: "Camara" };
+  const haas = { constructorId: "haas", name: "Haas F1 Team" };
+  const row = (Driver, points) => ({ points, Driver, Constructors: [haas] });
+  const season = parseSeason({
+    ...MRData,
+    drivers: {
+      StandingsTable: {
+        StandingsLists: [
+          { DriverStandings: [row(bearman, "23"), row(ocon, "7"), row(camara, "0")] },
+        ],
+      },
+    },
+  });
+  assert.equal(season.drivers.find((d) => d.id === "driver-ocon").active, false);
+  assert.deepEqual(
+    racingDrivers(season.drivers)
+      .filter((d) => d.teamId === "team-haas")
+      .map((d) => d.id),
+    ["driver-bearman", "driver-rafael_camara"],
+  );
+  // Coéquipier de Bearman : Câmara (qui court), pas Ocon malgré ses points.
+  assert.equal(teammateOf(season.drivers, "driver-bearman").id, "driver-rafael_camara");
+});

@@ -21,6 +21,11 @@ export const ROSTER_ADDITIONS = {
   2026: [{ driverId: "hirakawa", givenName: "Ryo", familyName: "Hirakawa", constructorId: "haas" }],
 };
 const additionsOf = (season) => ROSTER_ADDITIONS[season] ?? [];
+// Pilotes qui ne courent plus cette saison (remplacés jusqu'à la fin) : gardés
+// dans les classements, retirés des choix de pronos. Ids sans « driver- ».
+export const ROSTER_INACTIVE = {
+  2026: ["ocon", "hirakawa"], // Haas : Bearman et Câmara jusqu'à la fin de saison
+};
 // Même pilote si Jolpica lui donne un autre identifiant : on garde le nôtre,
 // pour que paris et résultats parlent du même pilote.
 const plainName = (t) =>
@@ -151,7 +156,10 @@ function withAdditions(list, teams, season) {
       teamId: `team-${a.constructorId}`,
       points: 0,
     }));
-  return [...list, ...extra];
+  const inactive = ROSTER_INACTIVE[season] ?? [];
+  return [...list, ...extra].map((d) =>
+    inactive.includes(d.id.replace(/^driver-/, "")) ? { ...d, active: false } : d,
+  );
 }
 
 export async function loadSeason(fetchFn = fetch) {

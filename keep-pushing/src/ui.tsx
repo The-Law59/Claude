@@ -13,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { api, hasApi } from "./api.mjs";
-import { articleVisible, setProtected } from "./model.mjs";
+import { articleVisible, racingDrivers, setProtected } from "./model.mjs";
 import { penaltyLabel } from "./penalties.mjs";
 import { DEFAULT_ACCENT, accentFor, glowFor, mix, readableOn, tint } from "./teams.mjs";
 import { type Row, useStore } from "./store";
@@ -236,6 +236,7 @@ export function Screen({
 }
 
 // Menu ☰ : tout ce qui n'est pas dans les onglets du bas.
+const TAB_ROUTES = ["/", "/pronos", "/forum", "/season", "/favorites", "/settings"];
 function Menu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { c, s } = useTheme();
   const { prefs, inbox } = useStore();
@@ -253,6 +254,15 @@ function Menu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const protectedCount = prefs.protectedSessions.length;
   type Item = [icon: string, label: string, href: string, badge?: number, hint?: string];
   const sections: [string, Item[]][] = [
+    [
+      "Navigation",
+      [
+        ["⌂", "Accueil", "/"],
+        ["🎯", "Pronos", "/pronos", unread("league:")],
+        ["💬", "Forum", "/forum", unread("forum:")],
+        ["▦", "Saison", "/season"],
+      ],
+    ],
     [
       "Mon espace",
       prefs.account
@@ -297,8 +307,8 @@ function Menu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   ];
   const go = (href: string) => {
     onClose();
-    // Favoris et Réglages sont des onglets cachés : on y navigue sans empiler.
-    if (href === "/favorites" || href === "/settings") router.navigate(href);
+    // Pages principales (onglets, barre du bas masquée) : on y navigue sans empiler.
+    if (TAB_ROUTES.includes(href)) router.navigate(href as never);
     else router.push(href as never);
   };
   return (
@@ -672,7 +682,7 @@ export function DriverPicker({ onPick }: { onPick: (id: string) => void }) {
   const { season } = useStore();
   return (
     <View style={s.pills}>
-      {season.drivers.map((d) => (
+      {racingDrivers(season.drivers).map((d) => (
         <Pressable
           key={d.id}
           accessibilityRole="button"
