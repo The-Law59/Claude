@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
-import { reminderPlan } from "./model.mjs";
+import { betReminderPlan, reminderPlan } from "./model.mjs";
 export async function syncReminders(
   prefs: any,
   event: { name: string; sessions: { id: string; label: string; startsAt: string }[] },
@@ -11,18 +11,18 @@ export async function syncReminders(
       name: "Rappels de sessions",
       importance: Notifications.AndroidImportance.DEFAULT,
     });
-  if (prefs.reminders) {
+  if (prefs.reminders || prefs.betReminders) {
     let permission = await Notifications.getPermissionsAsync();
+    if (!permission.granted) permission = await Notifications.requestPermissionsAsync();
     if (!permission.granted)
-      permission = await Notifications.requestPermissionsAsync();
-    if (!permission.granted)
-      throw new Error(
-        "Notifications refusées. Autorisez-les dans les réglages du téléphone.",
-      );
+      throw new Error("Notifications refusées. Autorisez-les dans les réglages du téléphone.");
   }
   // Toutes les notifications de cette V1 sont des rappels neutres, jamais des résultats.
   await Notifications.cancelAllScheduledNotificationsAsync();
-  const plan = reminderPlan(event.sessions, prefs, Date.now(), event.name);
+  const plan = [
+    ...reminderPlan(event.sessions, prefs, Date.now(), event.name),
+    ...betReminderPlan(event.sessions, prefs, Date.now(), event.name),
+  ];
   for (const r of plan)
     await Notifications.scheduleNotificationAsync({
       identifier: `kp-${r.id}`,
@@ -33,7 +33,16 @@ export async function syncReminders(
         channelId: "sessions",
       },
     });
-  return plan.length
-    ? `${plan.length} rappels programmés.`
-    : "Aucun rappel à venir.";
+  return plan.length ? `${plan.length} rappels programmés.` : "Aucun rappel à venir.";
+}
+
+// Alerte immédiate (réponse au forum, message de ligue), seulement si les
+// notifications sont déjà autorisées : on ne redemande pas la permission.
+export async function notifyNow(title: string, body: string) {
+  if (Platform.OS === "web") return;
+  const permission = await Notifications.getPermissionsAsync().catch(() => null);
+  if (!permission?.granted) return;
+  await Notifications.scheduleNotificationAsync({ content: { title, body }, trigger: null }).catch(
+    () => {},
+  );
 }

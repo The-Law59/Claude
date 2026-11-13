@@ -16,6 +16,46 @@ export const TEAM_COLORS = {
 };
 export const accentFor = (teamId) => TEAM_COLORS[teamId] ?? DEFAULT_ACCENT;
 
+// Teinte vive de chaque écurie : lueurs, bordures et onglets du thème sombre.
+export const DEFAULT_GLOW = "#ff5a3d";
+export const TEAM_GLOW = {
+  "team-ferrari": "#ff3045",
+  "team-mercedes": "#19d3bf",
+  "team-red_bull": "#4d7bff",
+  "team-mclaren": "#ff8a1f",
+  "team-aston_martin": "#2fd39a",
+  "team-alpine": "#ff6fae",
+  "team-williams": "#3c8cff",
+  "team-rb": "#7d95ff",
+  "team-haas": "#ff3b30",
+  "team-audi": "#ff3b4f",
+  "team-cadillac": "#d4af37",
+};
+export const glowFor = (teamId) => TEAM_GLOW[teamId] ?? DEFAULT_GLOW;
+
+// Badge d'écurie : initiales dessinées par l'appli (pas de logo officiel).
+export const TEAM_INITIALS = {
+  "team-ferrari": "SF",
+  "team-mercedes": "MER",
+  "team-red_bull": "RBR",
+  "team-mclaren": "MCL",
+  "team-aston_martin": "AMR",
+  "team-alpine": "ALP",
+  "team-williams": "WIL",
+  "team-rb": "RB",
+  "team-haas": "HAAS",
+  "team-audi": "AUD",
+  "team-cadillac": "CAD",
+};
+export const initialsFor = (teamId, name = "") =>
+  TEAM_INITIALS[teamId] ??
+  name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 3)
+    .toUpperCase();
+
 const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 const luminance = (hex) => {
   const [r, g, b] = rgb(hex).map((v) => {
@@ -28,5 +68,31 @@ export const contrastWithWhite = (hex) => 1.05 / (luminance(hex) + 0.05);
 // Fond pâle dérivé de l'accent (cartes surlignées, boutons secondaires).
 export const tint = (hex, amount = 0.1) =>
   `#${rgb(hex)
-    .map((v) => Math.round(255 - (255 - v) * amount).toString(16).padStart(2, "0"))
+    .map((v) =>
+      Math.round(255 - (255 - v) * amount)
+        .toString(16)
+        .padStart(2, "0"),
+    )
     .join("")}`;
+
+export const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+// Mélange de deux couleurs (t = part de b).
+export const mix = (a, b, t) =>
+  `#${rgb(a)
+    .map((v, i) =>
+      Math.round(v + (rgb(b)[i] - v) * t)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+// Mode sombre : couleur éclaircie juste assez pour 4,5:1 sur le fond donné.
+export function readableOn(hex, bg) {
+  for (let t = 0; t <= 1; t += 0.05) {
+    const c = mix(hex, "#ffffff", t);
+    if (contrast(c, bg) >= 4.5) return c;
+  }
+  return "#ffffff";
+}

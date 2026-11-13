@@ -1,11 +1,11 @@
 import { Pressable, Text, View } from "react-native";
+import { TeamBadge } from "../../src/design";
 import { setMine } from "../../src/model.mjs";
 import { useStore } from "../../src/store";
 import { Screen, Toggle, useTheme } from "../../src/ui";
-import { accentFor } from "../../src/teams.mjs";
 
 export default function Favorites() {
-  const { s } = useTheme();
+  const { s, team } = useTheme();
   const { prefs, setPrefs, update, season } = useStore();
   const toggle = (id: string, on: boolean) =>
     update({
@@ -19,15 +19,44 @@ export default function Favorites() {
   return (
     <Screen>
       <Text style={s.title}>Votre paddock.</Text>
-      <Text style={s.subtitle}>Touchez pour choisir. L’app prend la couleur de votre écurie.</Text>
-      {pickers.map(([title, key, list]) => (
+      <Text style={s.subtitle}>Choisissez votre écurie : toute l’appli prend ses couleurs.</Text>
+      <Text style={s.heading}>Mon écurie</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+        {season.teams.map((t) => {
+          const selected = prefs.myTeam === t.id;
+          return (
+            <Pressable
+              key={t.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Mon écurie : ${t.name}`}
+              accessibilityState={{ selected }}
+              onPress={() => setPrefs((p) => setMine(p, "myTeam", selected ? "" : t.id))}
+              style={{ width: 96, alignItems: "center", gap: 6 }}
+            >
+              <TeamBadge teamId={t.id} name={t.name} size={72} selected={selected} />
+              <Text
+                style={[
+                  s.small,
+                  { textAlign: "center" },
+                  selected && { color: s.text.color, fontWeight: "800" },
+                ]}
+                numberOfLines={2}
+              >
+                {selected ? "★ " : ""}
+                {t.name}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {pickers.slice(1).map(([title, key, list]) => (
         <View key={key}>
           <Text style={s.heading}>{title}</Text>
           <View style={s.pills}>
             {list.map((f) => {
               const selected = prefs[key] === f.id;
               // Chaque écurie s'affiche dans sa couleur ; un pilote dans celle de son écurie.
-              const color = accentFor("teamId" in f ? f.teamId : f.id);
+              const color = team("teamId" in f ? f.teamId : f.id);
               return (
                 <Pressable
                   key={f.id}

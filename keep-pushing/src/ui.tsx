@@ -1,21 +1,55 @@
-import React, { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+  useColorScheme,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
-import { setProtected } from "./model.mjs";
-import { DEFAULT_ACCENT, accentFor, tint } from "./teams.mjs";
-import { useStore } from "./store";
+import { api, hasApi } from "./api.mjs";
+import { articleVisible, racingDrivers, setProtected } from "./model.mjs";
+import { penaltyLabel } from "./penalties.mjs";
+import { DEFAULT_ACCENT, accentFor, glowFor, mix, readableOn, tint } from "./teams.mjs";
+import { type Row, useStore } from "./store";
 
-const base = {
-  bg: "#f5f6f8",
+const light = {
+  bg: "#f3f5f8",
   card: "#ffffff",
-  ink: "#202631",
-  muted: "#626c79",
+  ink: "#1d232d",
+  muted: "#5d6775",
   accent: DEFAULT_ACCENT,
-  line: "#dce0e6",
+  accentBg: DEFAULT_ACCENT, // fond des boutons (texte blanc)
+  glow: DEFAULT_ACCENT, // lueurs, bordures mises en avant, onglet actif
+  line: "#dfe3e9",
   soft: tint(DEFAULT_ACCENT),
   green: "#2e6746",
+  chip: "#e9edf2",
+  lock: "#e7efe8",
+  lockOn: "#e4eee6",
+  warn: "#fbeedd",
+  error: "#9c3020",
+  hero: "#202631",
+};
+const dark = {
+  ...light,
+  bg: "#0b0e13",
+  card: "#141920",
+  ink: "#eef1f5",
+  muted: "#98a2b0",
+  line: "#242b35",
+  green: "#7cc99a",
+  chip: "#1c222b",
+  lock: "#17251c",
+  lockOn: "#1d3324",
+  warn: "#3a2a14",
+  error: "#ff8f7a",
+  hero: "#1f252e",
 };
 export const formatDate = (date: string | number) =>
   new Date(date).toLocaleString("fr-FR", {
@@ -26,14 +60,26 @@ export const formatDate = (date: string | number) =>
     minute: "2-digit",
   });
 
-// Thème aux couleurs de « mon écurie » ; recalculé seulement quand elle change.
+// Thème aux couleurs de « mon écurie », clair ou sombre (réglage ou système).
+// team(id) : couleur d'une écurie lisible sur le fond du thème.
 export function useTheme() {
   const { prefs } = useStore();
+  const system = useColorScheme();
+  const isDark = prefs.theme === "dark" || (prefs.theme === "auto" && system === "dark");
   return useMemo(() => {
-    const accent = accentFor(prefs.myTeam);
-    const c = { ...base, accent, soft: tint(accent) };
-    return { c, s: makeStyles(c) };
-  }, [prefs.myTeam]);
+    const base = accentFor(prefs.myTeam);
+    if (!isDark) {
+      const c = { ...light, accent: base, accentBg: base, glow: base, soft: tint(base) };
+      return { c, s: makeStyles(c), dark: false, team: (id: string) => accentFor(id) };
+    }
+    const soft = mix(base, dark.card, 0.75);
+    // Teinte vive de l'écurie, éclaircie si besoin pour rester lisible en texte.
+    const glow = readableOn(glowFor(prefs.myTeam), dark.card);
+    const c = { ...dark, accentBg: base, soft, glow, accent: readableOn(glow, soft) };
+    // Repère un peu plus clair que les cartes : lisible aussi sur les lignes surlignées.
+    const team = (id: string) => readableOn(accentFor(id), "#262c35");
+    return { c, s: makeStyles(c), dark: true, team };
+  }, [prefs.myTeam, isDark]);
 }
 
 export function Button({
@@ -112,36 +158,69 @@ export function Pills<T extends string | number | boolean>({
   );
 }
 
-// En-tête commun : marque, bouclier anti-spoil, origine des données.
-export function Screen({ children }: { children: React.ReactNode }) {
-  const { c, s } = useTheme();
-  const { prefs, season, error } = useStore();
+// En-tête commun : menu ☰, marque, notifications, origine des données.
+// overlay : bouton flottant (ex. « + » du forum), hors du défilement.
+export function Screen({
+  children,
+  overlay,
+}: {
+  children: React.ReactNode;
+  overlay?: React.ReactNode;
+}) {
+  const { c, s, dark } = useTheme();
+  const { prefs, season, error, inbox } = useStore();
   const router = useRouter();
+  const [menu, setMenu] = useState(false);
   const protectedAny = prefs.protectedSessions.length > 0;
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={dark ? "light" : "dark"} />
       <View style={s.header}>
-        <View>
-          <Text style={s.brand}>
-            Keep <Text style={{ color: c.accent }}>Pushing.</Text>
-          </Text>
-          <Text style={s.small}>La F1 à votre rythme.</Text>
-        </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Gérer l’anti-spoil"
-          onPress={() => router.navigate("/settings")}
-          style={[s.shield, protectedAny && { backgroundColor: "#e4eee6" }]}
+          accessibilityLabel="Ouvrir le menu"
+          onPress={() => setMenu(true)}
+          style={s.iconButton}
         >
-          <Text style={{ color: protectedAny ? c.green : c.ink }}>◈</Text>
-          <Text style={s.tiny}>{protectedAny ? "Protégé" : "Anti-spoil"}</Text>
+          <Text style={{ color: c.ink, fontSize: 22 }}>☰</Text>
         </Pressable>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={s.brand} accessibilityRole="header">
+            Race<Text style={{ color: c.glow }}>IQ</Text>
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", gap: 8, minWidth: 46, justifyContent: "flex-end" }}>
+          {/* Anti-spoil : visible seulement quand il protège quelque chose. */}
+          {protectedAny && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Anti-spoil actif : gérer la protection"
+              onPress={() => router.navigate("/settings")}
+              style={[s.iconButton, { backgroundColor: c.lockOn }]}
+            >
+              <Text style={{ color: c.green, fontSize: 18 }}>◈</Text>
+            </Pressable>
+          )}
+          {!!prefs.account && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Notifications : ${inbox.unread} non lue(s)`}
+              onPress={() => router.push("/notifications")}
+              style={s.iconButton}
+            >
+              <Text style={{ fontSize: 20 }}>🔔</Text>
+              {inbox.unread > 0 && (
+                <Text style={s.dot}>{inbox.unread > 9 ? "9+" : inbox.unread}</Text>
+              )}
+            </Pressable>
+          )}
+        </View>
       </View>
+      <Menu visible={menu} onClose={() => setMenu(false)} />
       <View style={s.demo}>
         <Text style={s.tiny}>
           {season.mode === "live"
-            ? "CALENDRIER ET RÉSULTATS · JOLPICA F1"
+            ? `CALENDRIER ET RÉSULTATS · ${season.source === "hyprace" ? "HYPRACE" : "JOLPICA"}`
             : "DÉMONSTRATION · DONNÉES FICTIVES"}
         </Text>
       </View>
@@ -151,7 +230,143 @@ export function Screen({ children }: { children: React.ReactNode }) {
         </Text>
       )}
       <ScrollView contentContainerStyle={s.content}>{children}</ScrollView>
+      {overlay}
     </SafeAreaView>
+  );
+}
+
+// Menu ☰ : tout ce qui n'est pas dans les onglets du bas.
+const TAB_ROUTES = ["/", "/pronos", "/forum", "/season", "/favorites", "/settings"];
+function Menu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { c, s } = useTheme();
+  const { prefs, inbox } = useStore();
+  const router = useRouter();
+  const call = useCall();
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => {
+    if (!visible || !prefs.account || !hasApi()) return;
+    call("/api/me")
+      .then((me) => setAdmin(!!me.admin))
+      .catch(() => setAdmin(false));
+  }, [visible, call, prefs.account]);
+  const unread = (prefix: string) =>
+    inbox.items.filter((n) => !n.read && n.key.startsWith(prefix)).length;
+  const protectedCount = prefs.protectedSessions.length;
+  type Item = [icon: string, label: string, href: string, badge?: number, hint?: string];
+  const sections: [string, Item[]][] = [
+    [
+      "Navigation",
+      [
+        ["⌂", "Accueil", "/"],
+        ["🎯", "Pronos", "/pronos", unread("league:")],
+        ["💬", "Forum", "/forum", unread("forum:")],
+        ["▦", "Saison", "/season"],
+      ],
+    ],
+    [
+      "Mon espace",
+      prefs.account
+        ? [
+            ["♡", "Favoris", "/favorites"],
+            ["👥", "Amis", "/friends", unread("friend:")],
+            ["🔔", "Notifications", "/notifications", inbox.unread],
+            ["👤", "Mon compte", "/account", 0, prefs.account.pseudo],
+          ]
+        : [
+            ["♡", "Favoris", "/favorites"],
+            ["👤", "Se connecter", "/login"],
+          ],
+    ],
+    [
+      "Jeux",
+      [["🔁", "Mercato : la grille de la saison prochaine", "/mercato", unread("mercato:")]],
+    ],
+    [
+      "Outils F1",
+      [
+        ["⚔", "Duel de pilotes", "/duel"],
+        ["🏎", "Duel d’écuries", "/teams-duel"],
+        ["🧮", "Simulateur de championnat", "/simulator"],
+      ],
+    ],
+    [
+      "Appli",
+      [
+        [
+          "◈",
+          "Anti-spoil",
+          "/settings",
+          0,
+          protectedCount ? `${protectedCount} session(s) protégée(s)` : "désactivé",
+        ],
+        ["⚙", "Réglages", "/settings"],
+        ...(prefs.account ? [["💬", "Donner mon avis", "/feedback"] as Item] : []),
+        ...(admin ? [["📊", "Tableau de bord admin", "/admin"] as Item] : []),
+      ],
+    ],
+  ];
+  const go = (href: string) => {
+    onClose();
+    // Pages principales (onglets, barre du bas masquée) : on y navigue sans empiler.
+    if (TAB_ROUTES.includes(href)) router.navigate(href as never);
+    else router.push(href as never);
+  };
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1, flexDirection: "row" }}>
+        <SafeAreaView
+          edges={["top", "bottom"]}
+          style={{ width: "82%", maxWidth: 340, backgroundColor: c.bg }}
+        >
+          <ScrollView contentContainerStyle={{ padding: 20, gap: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <Text style={[s.brand, { flex: 1 }]}>
+                Race<Text style={{ color: c.accent }}>IQ</Text>
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fermer le menu"
+                onPress={onClose}
+                style={s.iconButton}
+              >
+                <Text style={{ color: c.ink, fontSize: 20 }}>✕</Text>
+              </Pressable>
+            </View>
+            {sections.map(([title, items]) => (
+              <View key={title} style={{ gap: 2, marginTop: 10 }}>
+                <Text style={s.label}>{title.toUpperCase()}</Text>
+                {items.map(([icon, label, href, badge, hint]) => (
+                  <Pressable
+                    key={label}
+                    accessibilityRole="button"
+                    accessibilityLabel={badge ? `${label} : ${badge} nouveauté(s)` : label}
+                    onPress={() => go(href)}
+                    style={({ pressed }) => [s.menuItem, pressed && { backgroundColor: c.chip }]}
+                  >
+                    <Text style={{ width: 30, fontSize: 18, color: c.ink }}>{icon}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.text}>{label}</Text>
+                      {!!hint && <Text style={s.small}>{hint}</Text>}
+                    </View>
+                    {!!badge && (
+                      <Text style={[s.dot, { position: "relative", top: 0, right: 0 }]}>
+                        {badge}
+                      </Text>
+                    )}
+                    <Text style={[s.small, { marginLeft: 8 }]}>›</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+        <Pressable
+          accessibilityLabel="Fermer le menu"
+          onPress={onClose}
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)" }}
+        />
+      </View>
+    </Modal>
   );
 }
 
@@ -161,22 +376,47 @@ const BADGES = {
   press: ["PRESSE", "#3d4552", "#e8ebef"],
   unofficial: ["⚠ NON OFFICIEL", "#8a4b00", "#fbeedd"],
 } as const;
-export function SourceBadge({ kind, lang }: { kind?: keyof typeof BADGES; lang?: string }) {
+export function SourceBadge({
+  kind,
+  lang,
+  translated,
+}: {
+  kind?: keyof typeof BADGES;
+  lang?: string;
+  translated?: boolean;
+}) {
   const { s } = useTheme();
   if (!kind) return null;
   const [label, color, bg] = BADGES[kind];
   return (
     <View style={s.badgeRow}>
       <Text style={[s.badge, { color, backgroundColor: bg }]}>{label}</Text>
-      {lang && lang !== "FR" && <Text style={[s.badge, s.badgeLang]}>{lang}</Text>}
+      {translated ? (
+        <Text style={[s.badge, s.badgeLang]}>TRADUIT DE L’ANGLAIS</Text>
+      ) : (
+        lang && lang !== "FR" && <Text style={[s.badge, s.badgeLang]}>{lang}</Text>
+      )}
     </View>
   );
 }
 
 // Classement d'une session, ou verrou si elle est protégée.
 export function ResultRows({ sessionId }: { sessionId: string }) {
+  // Essais libres : servis par le serveur s'il a un fournisseur configuré.
+  const [extra, setExtra] = useState<Row[] | undefined>(undefined);
+  const [extraState, setExtraState] = useState<"idle" | "loading" | "done">("idle");
+  useEffect(() => {
+    setExtra(undefined);
+    if (!hasApi() || !/:(First|Second|Third)Practice$|:SprintQualifying$/.test(sessionId)) return;
+    setExtraState("loading");
+    api(`/api/practice/${sessionId}`)
+      .then((d) => d.available && setExtra(d.rows))
+      .catch(() => {})
+      .finally(() => setExtraState("done"));
+  }, [sessionId]);
   const { c, s } = useTheme();
   const { prefs, setPrefs, season } = useStore();
+  const router = useRouter();
   if (prefs.protectedSessions.includes(sessionId))
     return (
       <View style={s.lock}>
@@ -184,19 +424,28 @@ export function ResultRows({ sessionId }: { sessionId: string }) {
         <Text style={s.text}>Regardez-la à votre rythme. Son résultat reste masqué.</Text>
         <Button
           label="J’ai regardé cette session"
-          onPress={() => setPrefs((p) => setProtected(p, sessionId, false))}
+          onPress={() =>
+            // Course et sprint : révélation du podium ; autres sessions : déblocage direct.
+            /:(Race|Sprint)$/.test(sessionId)
+              ? router.push(`/reveal/${encodeURIComponent(sessionId)}`)
+              : setPrefs((p) => setProtected(p, sessionId, false))
+          }
           secondary
         />
       </View>
     );
-  const rows = season.results[sessionId];
+  const session = season.events.flatMap((e) => e.sessions).find((x) => x.id === sessionId);
+  const practice = !!session && /Practice|SprintQualifying/.test(session.type);
+  const rows = season.results[sessionId] ?? extra;
   if (!rows?.length) {
-    const session = season.events.flatMap((e) => e.sessions).find((x) => x.id === sessionId);
-    const message = !session || Date.parse(session.startsAt) > Date.now()
-      ? "Session à venir."
-      : /Practice|SprintQualifying/.test(session.type)
-        ? "Pas de classement disponible pour cette session."
-        : "Chargement des résultats…";
+    const message =
+      !session || Date.parse(session.startsAt) > Date.now()
+        ? "Session à venir."
+        : practice
+          ? extraState === "loading"
+            ? "Chargement des résultats…"
+            : "Résultats des essais pas encore disponibles dans RaceIQ : notre source de données actuelle ne les publie pas. Ils arriveront avec une source officielle."
+          : "Chargement des résultats…";
     return (
       <View style={s.card}>
         <Text style={s.text}>{message}</Text>
@@ -205,6 +454,11 @@ export function ResultRows({ sessionId }: { sessionId: string }) {
   }
   return (
     <View style={s.card}>
+      {rows[0]?.corrected && (
+        <Text style={s.small}>
+          ⚖️ Classement corrigé après pénalités (temps d’origine affichés).
+        </Text>
+      )}
       {rows.map((r) => (
         <View style={[s.rank, r.driverId === prefs.myDriver && s.mine]} key={r.position}>
           <Text style={s.position}>{r.position}</Text>
@@ -219,146 +473,298 @@ export function ResultRows({ sessionId }: { sessionId: string }) {
   );
 }
 
-const makeStyles = (c: typeof base) =>
+const makeStyles = (c: typeof light) =>
   StyleSheet.create({
-  safe: { flex: 1, backgroundColor: c.bg },
-  loading: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 16,
-    backgroundColor: c.bg,
-  },
-  header: {
-    paddingHorizontal: 22,
-    paddingTop: 14,
-    paddingBottom: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  brand: {
-    fontSize: 26,
-    fontWeight: "800",
-    fontStyle: "italic",
-    letterSpacing: -1,
-    color: c.ink,
-  },
-  shield: {
-    minWidth: 64,
-    minHeight: 48,
-    padding: 8,
-    borderRadius: 12,
-    backgroundColor: "#e8ebef",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  demo: { paddingHorizontal: 22, paddingVertical: 8 },
-  content: {
-    paddingHorizontal: 22,
-    paddingTop: 10,
-    paddingBottom: 30,
-    gap: 12,
-    maxWidth: 640,
-    width: "100%",
-    alignSelf: "center",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    letterSpacing: -0.8,
-    color: c.ink,
-    marginTop: 8,
-  },
-  subtitle: { fontSize: 14, color: c.muted },
-  heading: { fontSize: 19, fontWeight: "700", color: c.ink, marginTop: 12 },
-  text: { fontSize: 15, lineHeight: 22, color: c.ink },
-  small: { fontSize: 12, lineHeight: 18, color: c.muted },
-  tiny: { fontSize: 11, color: c.muted },
-  hero: {
-    backgroundColor: c.ink,
-    padding: 22,
-    borderRadius: 14,
-    gap: 8,
-    marginTop: 8,
-  },
-  heroLabel: { fontSize: 11, letterSpacing: 1, color: "#f3d5c8" },
-  heroTitle: { fontSize: 25, fontWeight: "700", color: "#fff" },
-  heroText: { fontSize: 14, color: "#e5e8ed" },
-  button: {
-    backgroundColor: c.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderRadius: 10,
-    minHeight: 46,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonText: { fontSize: 14, fontWeight: "700", color: "#fff" },
-  secondary: { backgroundColor: c.soft },
-  pills: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginVertical: 6 },
-  pill: {
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    minHeight: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: c.line,
-  },
-  pillActive: { backgroundColor: c.ink, borderColor: c.ink },
-  pillTextActive: { color: "#fff", fontSize: 15 },
-  card: { backgroundColor: c.card, borderRadius: 14, padding: 18, gap: 8 },
-  cardTitle: { fontSize: 18, fontWeight: "600", lineHeight: 25, color: c.ink },
-  label: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-    color: c.accent,
-  },
-  badgeRow: { flexDirection: "row", gap: 6 },
-  badge: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    overflow: "hidden",
-  },
-  badgeLang: { color: c.muted, backgroundColor: c.line },
-  mine: { backgroundColor: c.soft, marginHorizontal: -10, paddingHorizontal: 10, borderRadius: 8 },
-  lock: { padding: 18, borderRadius: 14, backgroundColor: "#e7efe8", gap: 8 },
-  rank: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: c.line,
-  },
-  position: { fontSize: 22, fontWeight: "700", width: 32, color: c.ink },
-  time: { fontSize: 13, fontVariant: ["tabular-nums"], color: c.ink },
-  session: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: c.line,
-    gap: 12,
-  },
-  smallButton: {
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: 8,
-  },
-  link: { fontSize: 13, color: c.accent, fontWeight: "600" },
-  setting: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: c.line,
-  },
-  error: { color: "#9c3020", padding: 12, fontSize: 13 },
-});
+    safe: { flex: 1, backgroundColor: c.bg },
+    loading: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 16,
+      backgroundColor: c.bg,
+    },
+    header: {
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 8,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    brand: {
+      fontSize: 23,
+      fontWeight: "900",
+      fontStyle: "italic",
+      letterSpacing: -1,
+      color: c.ink,
+    },
+    iconButton: {
+      width: 46,
+      height: 46,
+      borderRadius: 14,
+      backgroundColor: c.chip,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dot: {
+      position: "absolute",
+      top: 4,
+      right: 4,
+      minWidth: 18,
+      paddingHorizontal: 4,
+      borderRadius: 9,
+      overflow: "hidden",
+      backgroundColor: c.accentBg,
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: "700",
+      textAlign: "center",
+      lineHeight: 18,
+    },
+    menuItem: {
+      minHeight: 52,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 8,
+      borderRadius: 10,
+    },
+    shield: {
+      minWidth: 64,
+      minHeight: 48,
+      padding: 8,
+      borderRadius: 12,
+      backgroundColor: c.chip,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    demo: { paddingHorizontal: 18, paddingBottom: 6, alignItems: "center" },
+    content: {
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 30,
+      gap: 12,
+      maxWidth: 640,
+      width: "100%",
+      alignSelf: "center",
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: "800",
+      letterSpacing: -0.8,
+      color: c.ink,
+      marginTop: 8,
+    },
+    subtitle: { fontSize: 14, color: c.muted },
+    heading: { fontSize: 19, fontWeight: "800", color: c.ink, marginTop: 12 },
+    text: { fontSize: 15, lineHeight: 22, color: c.ink },
+    small: { fontSize: 12, lineHeight: 18, color: c.muted },
+    tiny: { fontSize: 11, color: c.muted },
+    hero: {
+      backgroundColor: c.hero,
+      padding: 22,
+      borderRadius: 14,
+      gap: 8,
+      marginTop: 8,
+    },
+    heroLabel: { fontSize: 11, letterSpacing: 1, color: "#f3d5c8" },
+    heroTitle: { fontSize: 25, fontWeight: "700", color: "#fff" },
+    heroText: { fontSize: 14, color: "#e5e8ed" },
+    button: {
+      backgroundColor: c.accentBg,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderRadius: 14,
+      minHeight: 48,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 8,
+      shadowColor: c.accentBg,
+      shadowOpacity: 0.35,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 5 },
+      elevation: 4,
+    },
+    buttonText: { fontSize: 15, fontWeight: "800", color: "#fff" },
+    secondary: { backgroundColor: c.soft, shadowOpacity: 0, elevation: 0 },
+    pills: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginVertical: 6 },
+    pill: {
+      paddingHorizontal: 15,
+      paddingVertical: 12,
+      minHeight: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: c.line,
+    },
+    pillActive: { backgroundColor: c.accentBg, borderColor: c.accentBg },
+    pillTextActive: { color: "#fff", fontSize: 15, fontWeight: "700" },
+    card: {
+      backgroundColor: c.card,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: c.line,
+      padding: 16,
+      gap: 8,
+    },
+    // Carte mise en avant : bordure et lueur aux couleurs de l'écurie.
+    glowCard: {
+      borderWidth: 2,
+      borderColor: c.glow,
+      shadowColor: c.glow,
+      shadowOpacity: 0.3,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: 3,
+    },
+    cardSummary: { fontSize: 14, lineHeight: 20, color: c.muted },
+    cardTitle: { fontSize: 18, fontWeight: "600", lineHeight: 25, color: c.ink },
+    label: {
+      fontSize: 11,
+      fontWeight: "800",
+      letterSpacing: 1.2,
+      color: c.accent,
+    },
+    badgeRow: { flexDirection: "row", gap: 6 },
+    badge: {
+      fontSize: 11,
+      fontWeight: "700",
+      letterSpacing: 0.6,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+      overflow: "hidden",
+    },
+    badgeLang: { color: c.muted, backgroundColor: c.line },
+    mine: {
+      backgroundColor: c.soft,
+      marginHorizontal: -10,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+    },
+    lock: { padding: 16, borderRadius: 18, backgroundColor: c.lock, gap: 8 },
+    rank: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingVertical: 13,
+      borderBottomWidth: 1,
+      borderBottomColor: c.line,
+    },
+    position: { fontSize: 22, fontWeight: "700", width: 32, color: c.ink },
+    time: { fontSize: 13, fontVariant: ["tabular-nums"], color: c.ink },
+    session: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: c.line,
+      gap: 12,
+    },
+    smallButton: {
+      minHeight: 44,
+      justifyContent: "center",
+      paddingHorizontal: 8,
+    },
+    link: { fontSize: 13, color: c.accent, fontWeight: "600" },
+    setting: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: c.line,
+    },
+    error: { color: c.error, padding: 12, fontSize: 13 },
+  });
+
+// Choix d'un pilote : pastilles aux couleurs des écuries.
+export function DriverPicker({ onPick }: { onPick: (id: string) => void }) {
+  const { s, team } = useTheme();
+  const { season } = useStore();
+  return (
+    <View style={s.pills}>
+      {racingDrivers(season.drivers).map((d) => (
+        <Pressable
+          key={d.id}
+          accessibilityRole="button"
+          accessibilityLabel={d.name}
+          onPress={() => onPick(d.id)}
+          style={[s.pill, { borderColor: team(d.teamId) }]}
+        >
+          <Text style={[s.text, { color: team(d.teamId) }]}>{d.name.split(" ").at(-1)}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+// Actus liées à un pilote ou une écurie (tags), sans spoiler ni rumeur masquée.
+export function RelatedNews({ tags }: { tags: string[] }) {
+  const { s } = useTheme();
+  const { prefs, season } = useStore();
+  const router = useRouter();
+  const list = season.articles
+    .filter((a) => a.tags.some((t: string) => tags.includes(t)) && articleVisible(a, prefs, false))
+    .slice(0, 6);
+  if (!list.length) return null;
+  return (
+    <>
+      <Text style={s.heading}>Actualités</Text>
+      {list.map((a) => (
+        <Pressable
+          key={a.id}
+          accessibilityRole="link"
+          onPress={() => router.push(`/article/${a.id}`)}
+          style={s.card}
+        >
+          <SourceBadge kind={a.kind} lang={a.lang} translated={!!a.translatedFrom} />
+          <Text style={s.cardTitle}>{a.title}</Text>
+          {!!a.source && <Text style={s.small}>{a.source}</Text>}
+        </Pressable>
+      ))}
+    </>
+  );
+}
+
+// 1er, 2e, 3e…
+export const ordinal = (n: number) => (n === 1 ? "1er" : `${n}e`);
+
+// Appel authentifié ; une session expirée déconnecte l'appareil.
+export function useCall() {
+  const { prefs, update } = useStore();
+  return useCallback(
+    async (path: string, options: { method?: string; body?: unknown } = {}) => {
+      try {
+        return await api(path, { ...options, token: prefs.account?.token });
+      } catch (e) {
+        if ((e as { status?: number }).status === 401) update({ account: null });
+        throw e;
+      }
+    },
+    [prefs.account?.token],
+  );
+}
+
+// Pénalités de grille annoncées pour un GP (moteur, boîte de vitesses…).
+export type Penalty = { driverId: string; kind: string; places?: number; reason: string };
+export function PenaltyList({ penalties, hint }: { penalties: Penalty[]; hint?: string }) {
+  const { c, s, team } = useTheme();
+  const { season } = useStore();
+  if (!penalties.length) return null;
+  return (
+    <View style={[s.card, { borderColor: c.glow }]}>
+      <Text style={s.label}>⚠️ PÉNALITÉS DE GRILLE ANNONCÉES</Text>
+      {penalties.map((p) => {
+        const d = season.drivers.find((x) => x.id === p.driverId);
+        return (
+          <View key={p.driverId} style={[s.rank, { paddingVertical: 8 }]}>
+            <Text style={[s.text, { flex: 1, fontWeight: "700", color: team(d?.teamId ?? "") }]}>
+              {d?.name ?? p.driverId}
+            </Text>
+            <Text style={s.small}>{penaltyLabel(p)}</Text>
+          </View>
+        );
+      })}
+      {!!hint && <Text style={s.small}>{hint}</Text>}
+    </View>
+  );
+}

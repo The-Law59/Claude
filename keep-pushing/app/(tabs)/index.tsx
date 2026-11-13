@@ -1,18 +1,30 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
-import { articleVisible } from "../../src/model.mjs";
+import { useFocusEffect, useRouter } from "expo-router";
+import { api, hasApi } from "../../src/api.mjs";
+import { RecapCard } from "../../src/RecapCard";
+import { CircuitCard, Countdown, Hero, Shortcuts, Thumb, heroText } from "../../src/design";
+import {
+  articleVisible,
+  askFeedback,
+  nextAction,
+  protectWeekend,
+  teammateOf,
+} from "../../src/model.mjs";
 import { useStore } from "../../src/store";
-import { Button, Pills, Screen, SourceBadge, formatDate, useTheme } from "../../src/ui";
+import { Button, Pills, Screen, SourceBadge, formatDate, ordinal, useTheme } from "../../src/ui";
 
 export default function Home() {
   const { s } = useTheme();
-  const { prefs, season, focus, loadResults } = useStore();
+  const { prefs, setPrefs, season, focus, loadResults, inbox } = useStore();
   useEffect(() => loadResults(focus.last), [focus.last.id]);
   const router = useRouter();
   const [personal, setPersonal] = useState(true);
   const [kind, setKind] = useState<"all" | "official" | "press" | "unofficial">("all");
   const { current, last } = focus;
+  const race = current.sessions.at(-1)!;
+  const unread = (prefix: string) =>
+    inbox.items.filter((n) => !n.read && n.key.startsWith(prefix)).length;
   const next = current.sessions.find((x) => Date.parse(x.startsAt) > Date.now());
   const lastRaceProtected = prefs.protectedSessions.includes(last.sessions.at(-1)!.id);
   const visible = season.articles.filter(
@@ -29,27 +41,122 @@ export default function Home() {
   );
   return (
     <Screen>
-      <Text style={s.title}>Au cœur du paddock.</Text>
-      <Text style={s.subtitle}>Votre sélection, votre rythme.</Text>
-      <View style={s.hero}>
-        <Text style={s.heroLabel}>
-          {season.mode === "live" ? "PROCHAIN GRAND PRIX" : "WEEK-END DE DÉMONSTRATION"}
+      <Text style={s.title}>
+        {prefs.account ? `Salut ${prefs.account.pseudo} 👋` : "Au cœur du paddock."}
+      </Text>
+      <Text style={s.subtitle}>La F1 à votre rythme.</Text>
+      <Hero
+        label={
+          season.mode === "live"
+            ? `Prochain Grand Prix · manche ${current.round}`
+            : "Week-end de démonstration"
+        }
+        title={current.name}
+        onPress={season.mode === "live" ? () => router.push(`/gp/${current.id}`) : undefined}
+      >
+        {Date.parse(race.startsAt) > Date.now() && <Countdown to={Date.parse(race.startsAt)} />}
+        <Text style={heroText}>
+          {next
+            ? `📅 ${next.label} · ${formatDate(next.startsAt)}${current.location ? ` · ${current.location.locality}` : ""}`
+            : "Week-end terminé"}
         </Text>
-        <Text style={s.heroTitle}>{current.name}</Text>
-        <Text style={s.heroText}>
-          {next ? `${next.label} · ${formatDate(next.startsAt)}` : "Week-end terminé"}
-        </Text>
-        <Button
-          label={lastRaceProtected ? "Gérer la protection" : "Voir la dernière course →"}
-          onPress={() => router.navigate(lastRaceProtected ? "/settings" : "/live")}
+        {current.sessions.every((x) => prefs.protectedSessions.includes(x.id)) && (
+          <Text style={heroText}>🎬 Week-end en différé : rien ne sera dévoilé.</Text>
+        )}
+      </Hero>
+      {season.mode === "live" && (
+        <CircuitCard
+          circuitId={current.circuitId}
+          title={current.circuit}
+          subtitle={
+            current.location
+              ? `${current.location.locality}, ${current.location.country}`
+              : undefined
+          }
+          compact
+          onPress={() => router.push(`/gp/${current.id}`)}
         />
+      )}
+      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+        {season.mode === "live" && (
+          <View style={{ flexGrow: 1 }}>
+            <Button
+              label="🌦 Météo et circuit"
+              onPress={() => router.push(`/gp/${current.id}`)}
+              secondary
+            />
+          </View>
+        )}
+        <View style={{ flexGrow: 1 }}>
+          <Button
+            label={lastRaceProtected ? "◈ Gérer la protection" : "🏁 Dernière course"}
+            onPress={() => router.navigate(lastRaceProtected ? "/settings" : "/live")}
+            secondary
+          />
+        </View>
+        {!current.sessions.every((x) => prefs.protectedSessions.includes(x.id)) && (
+          <View style={{ flexGrow: 1 }}>
+            <Button
+              label="🎬 Je regarde en différé"
+              onPress={() => setPrefs((p) => protectWeekend(p, current.sessions, true))}
+              secondary
+            />
+          </View>
+        )}
       </View>
+      {season.mode === "live" && hasApi() && !!prefs.account && <TodoCard eventId={current.id} />}
+      {hasApi() && !!prefs.account && (
+        <Shortcuts
+          items={[
+            { icon: "🎯", label: "Pronos", onPress: () => router.navigate("/pronos") },
+            {
+              icon: "🏆",
+              label: "Ma ligue",
+              onPress: () => router.navigate("/pronos?tab=rank"),
+              badge: unread("league:"),
+            },
+            {
+              icon: "💬",
+              label: "Forum",
+              onPress: () => router.navigate("/forum"),
+              badge: unread("forum:"),
+            },
+          ]}
+        />
+      )}
       {prefs.protectedSessions.length > 0 && (
         <View style={s.lock}>
           <Text style={s.text}>
-            {prefs.protectedSessions.length} session(s) protégée(s). Les actualités
-            associées sont masquées.
+            {prefs.protectedSessions.length} session(s) protégée(s). Les actualités associées sont
+            masquées.
           </Text>
+        </View>
+      )}
+      {season.mode === "live" &&
+        hasApi() &&
+        !!prefs.account &&
+        prefs.recapClosed !== last.id &&
+        // Récap du dernier GP jusqu'au début du week-end suivant.
+        last.id !== current.id &&
+        Date.now() < Date.parse(current.sessions[0].startsAt) && (
+          <RecapCard
+            eventId={last.id}
+            onClose={() => setPrefs((p) => ({ ...p, recapClosed: last.id }))}
+          />
+        )}
+      {hasApi() && !!prefs.account && askFeedback(prefs) && (
+        <View style={s.card}>
+          <Text style={s.label}>VOTRE AVIS COMPTE</Text>
+          <Text style={s.text}>
+            Vous utilisez RaceIQ depuis quelques jours : qu’en pensez-vous ? 2 minutes pour nous
+            aider à l’améliorer.
+          </Text>
+          <Button label="💬 Donner mon avis" onPress={() => router.push("/feedback")} />
+          <Button
+            label="Plus tard"
+            secondary
+            onPress={() => setPrefs((p) => ({ ...p, feedbackAt: Date.now() }))}
+          />
         </View>
       )}
       <Text style={s.heading}>Mon paddock</Text>
@@ -71,11 +178,18 @@ export default function Home() {
                 <Text style={s.cardTitle}>{myDriver.name} ★</Text>
                 <Text style={s.small}>
                   {myDriver.team}
-                  {lastResult ? ` · ${lastResult.position}e à ${last.name}` : ""}
+                  {lastResult ? ` · ${ordinal(lastResult.position)} à ${last.name}` : ""}
                 </Text>
               </View>
               <Text style={s.time}>{myDriver.points} pts</Text>
             </View>
+          )}
+          {myDriver && (
+            <Button
+              label={`⚔ Duel face à ${teammateOf(season.drivers, myDriver.id)?.name ?? "son coéquipier"} →`}
+              onPress={() => router.push("/duel")}
+              secondary
+            />
           )}
           {myTeam && (
             <View style={s.rank}>
@@ -114,20 +228,24 @@ export default function Home() {
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push(`/article/${a.id}`)}
-          style={s.card}
+          style={[s.card, { flexDirection: "row", gap: 12 }]}
           key={a.id}
         >
-          <SourceBadge kind={a.kind} lang={a.lang} />
-          <Text style={s.label}>
-            {a.rumor ? "RUMEUR · " : ""}
-            {a.source
-              ? `${a.source.toUpperCase()}${a.dated === false ? "" : ` · ${formatDate(a.publishedAt!)}`}`
-              : a.rumor
-                ? "NON CONFIRMÉE"
-                : "ACTUALITÉ · DÉMONSTRATION"}
-          </Text>
-          <Text style={s.cardTitle}>{a.title}</Text>
-          <Text style={s.small}>Lire le résumé →</Text>
+          <Thumb />
+          <View style={{ flex: 1, gap: 4 }}>
+            <SourceBadge kind={a.kind} lang={a.lang} translated={!!a.translatedFrom} />
+            <Text style={[s.text, { fontWeight: "700" }]} numberOfLines={3}>
+              {a.title}
+            </Text>
+            <Text style={s.small}>
+              {a.rumor ? "Rumeur · " : ""}
+              {a.source
+                ? `${a.source}${a.dated === false ? "" : ` · ${formatDate(a.publishedAt!)}`}`
+                : a.rumor
+                  ? "Non confirmée"
+                  : "Actualité · démonstration"}
+            </Text>
+          </View>
         </Pressable>
       ))}
       {!visible.length && (
@@ -149,5 +267,69 @@ export default function Home() {
         </View>
       )}
     </Screen>
+  );
+}
+
+// Carte « À faire » : la seule action utile du moment (pronos, ami, notifications).
+type BetsView = {
+  closes: Record<string, number>;
+  opens: Record<string, number>;
+  parts: string[];
+  mine: Record<string, unknown> | null;
+};
+type Action = {
+  kind: string;
+  icon: string;
+  title: string;
+  href?: string;
+  label?: string;
+  at?: number;
+  opensAt?: number;
+  urgent?: boolean;
+};
+function TodoCard({ eventId }: { eventId: string }) {
+  const { s, c } = useTheme();
+  const { prefs, inbox } = useStore();
+  const router = useRouter();
+  const [bets, setBets] = useState<BetsView | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      api(`/api/bets/${eventId}`, { token: prefs.account?.token })
+        .then(setBets)
+        .catch(() => setBets(null));
+    }, [eventId, prefs.account?.token]),
+  );
+  const a = nextAction({
+    bets,
+    notices: inbox.items.filter((n) => !n.read),
+    eventId,
+  }) as Action | null;
+  if (!a) return null;
+  const when = (t: number) => {
+    const hours = Math.max(0, Math.round((t - Date.now()) / 3600000));
+    return hours < 48 ? `dans ${hours} h` : `le ${formatDate(t)}`;
+  };
+  const strong = a.kind !== "ready" && a.kind !== "soon";
+  return (
+    <View style={[s.card, strong && s.glowCard]}>
+      <Text style={s.label}>À FAIRE</Text>
+      <Text style={s.cardTitle}>
+        {a.icon} {a.title}
+      </Text>
+      {!!a.at && (
+        <Text style={[s.small, a.urgent && { color: c.accent, fontWeight: "700" }]}>
+          {a.kind === "ready" ? "Modifiables jusqu’à la fermeture, " : "Fermeture "}
+          {when(a.at)}.
+        </Text>
+      )}
+      {!!a.opensAt && <Text style={s.small}>Ouverture le {formatDate(a.opensAt)}.</Text>}
+      {!!a.href && (
+        <Button
+          label={`${a.label} →`}
+          secondary={!strong}
+          onPress={() => router.push(a.href as never)}
+        />
+      )}
+    </View>
   );
 }

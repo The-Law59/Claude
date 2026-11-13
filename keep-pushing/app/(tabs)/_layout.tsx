@@ -1,36 +1,19 @@
-import { Text } from "react-native";
-import { Tabs } from "expo-router";
-import { useTheme } from "../../src/ui";
+import { Redirect, Tabs } from "expo-router";
+import { hasApi } from "../../src/api.mjs";
+import { useStore } from "../../src/store";
 
-const tabs = [
-  ["index", "⌂", "Accueil"],
-  ["live", "◉", "Course"],
-  ["season", "▦", "Saison"],
-  ["favorites", "♡", "Favoris"],
-  ["settings", "☷", "Réglages"],
-];
+// Pages principales. Pas de barre en bas : tout s'ouvre depuis le menu ☰ de
+// l'en-tête (src/ui.tsx), qui porte aussi les pastilles (forum, ligues).
+const pages = ["index", "pronos", "forum", "season", "live", "favorites", "settings"];
 
 export default function TabsLayout() {
-  const { c } = useTheme();
+  const { prefs } = useStore();
+  // Premier lancement : portail de connexion (si un serveur est joignable).
+  if (!prefs.welcomed && !prefs.account && hasApi()) return <Redirect href="/login" />;
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: c.accent,
-        tabBarInactiveTintColor: c.muted,
-      }}
-    >
-      {tabs.map(([name, icon, title]) => (
-        <Tabs.Screen
-          key={name}
-          name={name}
-          options={{
-            title,
-            tabBarIcon: ({ color }) => (
-              <Text style={{ fontSize: 22, color }}>{icon}</Text>
-            ),
-          }}
-        />
+    <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
+      {pages.map((name) => (
+        <Tabs.Screen key={name} name={name} />
       ))}
     </Tabs>
   );
