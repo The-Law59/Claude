@@ -83,3 +83,14 @@ test("Pronos qualifs : grille provisoire avec pénalités, puis grille officiell
   assert.equal(ref.grid, true);
   assert.equal(ref.rows.at(-1).driverId, "a");
 });
+
+test("Pronos qualifs : grille officielle publiée avant la course (Hyprace)", () => {
+  const Qualifying = order.map((driverId, i) => ({ driverId, position: i + 1 }));
+  const Grid = ["b", "c", "d", "e", "f", "a"].map((driverId, i) => ({ driverId, position: i + 1 }));
+  const ref = qualiReference({ Qualifying, Grid, penalties: [{ driverId: "b", kind: "back" }] });
+  assert.equal(ref.grid, true);
+  assert.deepEqual(
+    ref.rows.map((r) => r.driverId),
+    ["b", "c", "d", "e", "f", "a"],
+  );
+});

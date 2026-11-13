@@ -78,9 +78,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/app/admin.tsx": {
-    "mtime": 1794493558.4340875,
-    "seen": 1794493741.048855,
-    "ast_hash": "fafbf336757ae7d0bbde708f17828cce",
+    "mtime": 1794561188.5439804,
+    "seen": 1794561332.0530047,
+    "ast_hash": "4eb253695ff9d2a56ff02d9c4953752a",
     "semantic_hash": ""
   },
   "keep-pushing/app/article/[id].tsx": {
@@ -186,9 +186,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/server.mjs": {
-    "mtime": 1794493574.427629,
-    "seen": 1794493741.0488806,
-    "ast_hash": "1c113fec31f8473dbf1eb4561d1f8835",
+    "mtime": 1794561149.871979,
+    "seen": 1794561332.0530353,
+    "ast_hash": "917c86bb0028eadf702488c6f9b49f53",
     "semantic_hash": ""
   },
   "keep-pushing/src/RecapCard.tsx": {
@@ -234,9 +234,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/bets.mjs": {
-    "mtime": 1794493515.3130531,
-    "seen": 1794493741.0488894,
-    "ast_hash": "42dc20284824e2a8683f3ee64bdc04e1",
+    "mtime": 1794561149.390573,
+    "seen": 1794561332.0530431,
+    "ast_hash": "ed2033f9cb41ff899ca12bbd14acfd46",
     "semantic_hash": ""
   },
   "keep-pushing/src/community.labels.mjs": {
@@ -270,9 +270,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/jolpica.mjs": {
-    "mtime": 1794493558.4306347,
-    "seen": 1794493741.0488966,
-    "ast_hash": "f86a89d1791f30d0c6d195be82512a80",
+    "mtime": 1794561149.388742,
+    "seen": 1794561332.0530531,
+    "ast_hash": "a575b09ed0a895850dc7fb0fcf42d6d8",
     "semantic_hash": ""
   },
   "keep-pushing/src/leagues.mjs": {
@@ -336,9 +336,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/store.tsx": {
-    "mtime": 1794493558.4314086,
-    "seen": 1794493741.0489144,
-    "ast_hash": "fff2b66a7e04e3230e27d89ff89b11d7",
+    "mtime": 1794561167.8588302,
+    "seen": 1794561332.0530736,
+    "ast_hash": "1f745e40b7fccfa5b90b3344d5f358b8",
     "semantic_hash": ""
   },
   "keep-pushing/src/teams.mjs": {
@@ -354,9 +354,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/ui.tsx": {
-    "mtime": 1794493558.434529,
-    "seen": 1794493741.0489194,
-    "ast_hash": "3c514f945a2bdff461253331dad62054",
+    "mtime": 1794561167.8592021,
+    "seen": 1794561332.0530798,
+    "ast_hash": "a60fc660e3ee2e73560a6567b7255d23",
     "semantic_hash": ""
   },
   "keep-pushing/src/weather.mjs": {
@@ -468,9 +468,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/README.md": {
-    "mtime": 1794493737.1698585,
-    "seen": 1794493741.0489628,
-    "ast_hash": "c97f3dfecfdd27a6f5e32fbf10de49b9",
+    "mtime": 1794561321.7166195,
+    "seen": 1794561332.0531151,
+    "ast_hash": "6129048ced7fbe6515a8420185176397",
     "semantic_hash": ""
   },
   "keep-pushing/VALIDATION.md": {
@@ -480,15 +480,15 @@
     "semantic_hash": ""
   },
   "keep-pushing/deploy/README.md": {
-    "mtime": 1794493515.3036253,
-    "seen": 1794493741.0489657,
-    "ast_hash": "da10778ecbb77cef3e8ac690a997ebb0",
+    "mtime": 1794561321.7158835,
+    "seen": 1794561332.053117,
+    "ast_hash": "35e807e1e99d657b6dce7e5a425ed0e8",
     "semantic_hash": ""
   },
   "keep-pushing/docker-compose.yml": {
-    "mtime": 1794493515.3076253,
-    "seen": 1794493741.048875,
-    "ast_hash": "f2e2f8aefbc2bbdbf023c41c9a2aa8ca",
+    "mtime": 1794561321.7155275,
+    "seen": 1794561332.053028,
+    "ast_hash": "e6d8f5ce5dd5b50e660450a1326494f2",
     "semantic_hash": ""
   },
   "keep-pushing/docs/pubs-joker.md": {
@@ -588,9 +588,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/tests/penalties.test.mjs": {
-    "mtime": 1794493515.3156254,
-    "seen": 1794493741.0489326,
-    "ast_hash": "0e5bd76bb935133fd9abefcf24fe6dd7",
+    "mtime": 1794561157.3519793,
+    "seen": 1794561332.053101,
+    "ast_hash": "025136b372270ba1647d08b26e2c62f0",
     "semantic_hash": ""
   },
   "keep-pushing/src/securite.mjs": {
@@ -603,6 +603,72 @@
     "mtime": 1794493515.3156254,
     "seen": 1794493741.0489357,
     "ast_hash": "59a62a931faab9f1747ddda66219bda9",
+    "semantic_hash": ""
+  },
+  "keep-pushing/src/hyprace.mjs": {
+    "mtime": 1794561239.6119823,
+    "seen": 1794561332.0530522,
+    "ast_hash": "e2908e671064bcad2189aede23686d1c",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/fixtures/hyprace/circuit.json": {
+    "mtime": 1794560963.1119723,
+    "seen": 1794561332.0530849,
+    "ast_hash": "78579d072ee49f1566ad039b7b5138a6",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/fixtures/hyprace/fp1.json": {
+    "mtime": 1794560963.1079724,
+    "seen": 1794561332.0530863,
+    "ast_hash": "a64f1c421a7fc0c1beae9744ac024475",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/fixtures/hyprace/gp2026.json": {
+    "mtime": 1794560963.0999722,
+    "seen": 1794561332.053087,
+    "ast_hash": "a668ab83fad959380702466d264af6ec",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/fixtures/hyprace/grid.json": {
+    "mtime": 1794560963.1079724,
+    "seen": 1794561332.053088,
+    "ast_hash": "cf4c0e5a7b4b442932e0addffed66ee6",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/fixtures/hyprace/quali.json": {
+    "mtime": 1794560963.1039724,
+    "seen": 1794561332.0530887,
+    "ast_hash": "35bdf53c15731882bce00451c98ca75a",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/fixtures/hyprace/race.json": {
+    "mtime": 1794560963.1039724,
+    "seen": 1794561332.0530899,
+    "ast_hash": "dc81e4ed63bbdc4b9754c4acf76f4aa7",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/fixtures/hyprace/sprint.json": {
+    "mtime": 1794560963.1119723,
+    "seen": 1794561332.0530906,
+    "ast_hash": "e07c30b6c925c8f06125db8cbdf66b97",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/fixtures/hyprace/squali.json": {
+    "mtime": 1794560963.1119723,
+    "seen": 1794561332.0530913,
+    "ast_hash": "98ea21a174347d50b765a14893b6c97e",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/fixtures/hyprace/teams.json": {
+    "mtime": 1794560963.1039724,
+    "seen": 1794561332.053092,
+    "ast_hash": "6b5a92d7e5eb5243013fb1cd34c07cc2",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/hyprace.test.mjs": {
+    "mtime": 1794561104.4879775,
+    "seen": 1794561332.0530944,
+    "ast_hash": "c75ff1efd9ca3208557629fcaf9e0760",
     "semantic_hash": ""
   },
   "keep-pushing/package-lock.json": {

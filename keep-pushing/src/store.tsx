@@ -64,6 +64,8 @@ export type Event = {
 };
 export type Season = {
   mode: string;
+  // Fournisseur des données : « hyprace » ou « jolpica » (affiché en en-tête).
+  source?: string;
   events: Event[];
   results: Record<string, Row[]>;
   // active: false pour un pilote remplacé jusqu'à la fin de saison (hors pronos).
@@ -132,14 +134,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (season.mode !== "live" || requested.current.has(event.id)) return;
     if (Date.parse(event.sessions[0].startsAt) > Date.now()) return;
     requested.current.add(event.id);
-    loadRound(event)
-      .then(async (more) => {
-        // Corrections des admins, si le serveur en a pour ce GP.
-        const fixes = hasApi()
-          ? await api(`/api/results/${event.id}/overrides`).catch(() => ({}))
-          : {};
-        return withOverrides(more, fixes);
-      })
+    // Avec un serveur : résultats servis par lui (Hyprace ou Jolpica, corrections
+    // des admins comprises). Sans serveur : Jolpica directement.
+    (hasApi()
+      ? (api(`/api/round/${event.id}`) as Promise<Record<string, Row[]>>)
+      : loadRound(event).then(async (more) => {
+          const fixes = hasApi()
+            ? await api(`/api/results/${event.id}/overrides`).catch(() => ({}))
+            : {};
+          return withOverrides(more, fixes);
+        })
+    )
       .then((more) => setSeason((x) => ({ ...x, results: { ...x.results, ...more } })))
       .catch(() => requested.current.delete(event.id));
   };
@@ -153,7 +158,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return null;
         }),
       // shortcut: sans réseau on retombe sur la démo, pas de cache hors ligne ; à ajouter si besoin.
-      loadSeason().catch(() => demoSeason) as Promise<Season>,
+      (hasApi()
+        ? (api("/api/season") as Promise<Season>).catch(() => loadSeason())
+        : loadSeason()
+      ).catch(() => demoSeason) as Promise<Season>,
       loadNews().catch(() => null),
     ]).then(([raw, loaded, news]) => {
       if (!alive) return;

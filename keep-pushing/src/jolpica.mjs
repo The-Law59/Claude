@@ -156,8 +156,13 @@ function withAdditions(list, teams, season) {
       teamId: `team-${a.constructorId}`,
       points: 0,
     }));
+  return markInactive([...list, ...extra], season);
+}
+
+// Pilotes remplacés jusqu'à la fin de saison (ROSTER_INACTIVE) : active: false.
+export function markInactive(drivers, season) {
   const inactive = ROSTER_INACTIVE[season] ?? [];
-  return [...list, ...extra].map((d) =>
+  return drivers.map((d) =>
     inactive.includes(d.id.replace(/^driver-/, "")) ? { ...d, active: false } : d,
   );
 }

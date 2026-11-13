@@ -220,7 +220,7 @@ export function Screen({
       <View style={s.demo}>
         <Text style={s.tiny}>
           {season.mode === "live"
-            ? "CALENDRIER ET RÉSULTATS · JOLPICA F1"
+            ? `CALENDRIER ET RÉSULTATS · ${season.source === "hyprace" ? "HYPRACE" : "JOLPICA"}`
             : "DÉMONSTRATION · DONNÉES FICTIVES"}
         </Text>
       </View>

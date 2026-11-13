@@ -9,7 +9,8 @@ import { copyFile, readFile, readdir, rm, writeFile, mkdir } from "node:fs/promi
 import { extname, join, normalize, sep } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { fetchFeeds, toArticle } from "./src/news.mjs";
-import { loadRound, loadSeason } from "./src/jolpica.mjs";
+import { loadRound, loadSeason, markInactive } from "./src/jolpica.mjs";
+import * as hyprace from "./src/hyprace.mjs";
 import { createTranslator } from "./src/translate.mjs";
 import * as accounts from "./src/accounts.mjs";
 import * as account from "./src/account.mjs";
@@ -84,15 +85,67 @@ async function refreshNews() {
 refreshNews();
 setInterval(refreshNews, 5 * 60 * 1000);
 
-// --- Saison (calendrier, pilotes) rafraîchie toutes les heures ; résultats
-// d'un GP gardés en mémoire une fois publiés (ils ne changent plus).
+// --- Saison (calendrier, pilotes, classements). Source : Hyprace si
+// HYPRACE_API_KEY est défini (relue toutes les 3 h, 2 appels), sinon Jolpica
+// (toutes les heures). Jolpica sert aussi de secours si Hyprace ne répond pas.
 let season = null;
-const refreshSeason = () =>
-  loadSeason()
-    .then((s) => (season = s))
+const hypraceClient = process.env.HYPRACE_API_KEY
+  ? hyprace.createHypraceClient({
+      apiKey: process.env.HYPRACE_API_KEY,
+      log: (m) => console.warn(m),
+    })
+  : null;
+// Cache Hyprace gardé sur disque (circuits, résultats des séances) : une séance
+// définitive n'est plus jamais redemandée, même après un redémarrage.
+const HYPRACE_FILE = join(DATA, "hyprace.json");
+const hypraceCache = JSON.parse(
+  await readFile(HYPRACE_FILE, "utf8").catch(() => '{"circuits":{},"sessions":{}}'),
+);
+let hypraceSaving = null;
+const saveHyprace = () => {
+  hypraceSaving ??= setTimeout(async () => {
+    hypraceSaving = null;
+    await mkdir(DATA, { recursive: true }).catch(() => {});
+    await writeFile(HYPRACE_FILE, JSON.stringify(hypraceCache)).catch((e) =>
+      console.warn(`Cache Hyprace : ${e.message}`),
+    );
+  }, 5000);
+};
+let hypraceContext = { people: new Map(), teamNames: new Map() };
+const roundLoader =
+  hypraceClient &&
+  hyprace.createRoundLoader(hypraceClient, () => hypraceContext, hypraceCache.sessions, {
+    onChange: saveHyprace,
+  });
+const fromHyprace = () => season?.source === "hyprace";
+const SEASON_YEAR = Number(process.env.SEASON_YEAR) || new Date().getUTCFullYear();
+async function refreshSeason() {
+  if (hypraceClient)
+    try {
+      const raw = await hyprace.loadSeasonFrom(hypraceClient, {
+        year: SEASON_YEAR,
+        circuits: hypraceCache.circuits,
+      });
+      saveHyprace();
+      const parsed = hyprace.parseSeason(raw);
+      parsed.drivers = markInactive(parsed.drivers, SEASON_YEAR);
+      hypraceContext = {
+        people: hyprace.peopleOf(raw.teams),
+        teamNames: new Map(raw.teams.map((t) => [t.id, hyprace.teamOf(t)])),
+      };
+      season = parsed;
+      return;
+    } catch (e) {
+      console.warn(`Saison Hyprace : ${e.message}`);
+      // Saison déjà chargée par Hyprace : on la garde plutôt que de changer d'identifiants.
+      if (fromHyprace()) return;
+    }
+  await loadSeason()
+    .then((s) => (season = { ...s, source: "jolpica" }))
     .catch((e) => console.warn(`Saison : ${e.message}`));
+}
 await refreshSeason();
-setInterval(refreshSeason, 60 * 60 * 1000);
+setInterval(refreshSeason, (hypraceClient ? 3 : 1) * 60 * 60 * 1000);
 
 // Résultats d'un week-end : gardés pour de bon une fois définitifs (course
 // publiée depuis 7 jours, pénalités d'après-course comprises), sinon
@@ -111,12 +164,12 @@ async function roundResults(event) {
   if (Date.now() < first) return {};
   if (!inflight.has(event.id)) {
     const next = queue
-      .then(() => loadRound(event))
+      .then(() => (fromHyprace() ? roundLoader.load(event) : loadRound(event)))
       .then((results) => {
         rounds.set(event.id, {
           results,
           at: Date.now(),
-          final: bets.resultsSettled(event, results),
+          final: fromHyprace() ? roundLoader.settled(event) : bets.resultsSettled(event, results),
         });
         return corrected(results);
       })
@@ -130,7 +183,9 @@ const bySession = (eventId) => {
   const r = withOverrides(rounds.get(eventId)?.results, state.resultOverrides);
   return (
     r && {
-      ...Object.fromEntries(["Qualifying", "Sprint", "Race"].map((t) => [t, r[`${eventId}:${t}`]])),
+      ...Object.fromEntries(
+        ["Qualifying", "Sprint", "Race", "Grid"].map((t) => [t, r[`${eventId}:${t}`]]),
+      ),
       // Pénalités de grille annoncées : grille provisoire des qualifs avant la course.
       penalties: state.gridPenalties?.[eventId] ?? [],
     }
@@ -662,6 +717,11 @@ async function api(req, path) {
     const [, eventId, type] = practice;
     const event = findEvent(eventId);
     if (!event || !isPractice(type)) return [404, { error: "Session inconnue." }];
+    // Hyprace : les essais viennent du même cache que les autres séances.
+    if (fromHyprace()) {
+      const rows = (await roundLoader.load(event, { all: true, max: 2 }))[`${eventId}:${type}`];
+      return [200, { available: true, rows: rows ?? [] }];
+    }
     if (!practiceSource) return [200, { available: false, rows: [] }];
     const key = `${eventId}:${type}`;
     const hit = practiceCache.get(key);
@@ -672,6 +732,22 @@ async function api(req, path) {
         at: Date.now(),
       });
     return [200, { available: true, rows: practiceCache.get(key).rows }];
+  }
+  // Saison et résultats servis par le serveur : les téléphones n'appellent
+  // plus d'API extérieure (la clé Hyprace reste ici).
+  if (path === "/api/season") {
+    if (!season) return [503, { error: "Saison indisponible." }];
+    const { articles, ...rest } = season;
+    return [200, rest];
+  }
+  const roundRoute = path.match(/^\/api\/round\/([\w-]+)$/);
+  if (roundRoute) {
+    const event = findEvent(roundRoute[1]);
+    if (!event) return [404, { error: "Grand Prix inconnu." }];
+    const results = fromHyprace()
+      ? await roundLoader.load(event, { all: true, max: 4 })
+      : await roundResults(event).catch(() => ({}));
+    return [200, withOverrides(results, state.resultOverrides)];
   }
   if (path.startsWith("/api/mercato")) return mercatoApi(req, path, auth, adminOnly);
   // --- Pubs récompensées (désactivées tant que ADS_ENABLED n'est pas à 1).
@@ -712,6 +788,11 @@ async function api(req, path) {
         ...admin.stats(state, { events: season?.events ?? [] }),
         health: monitor.health({ startedAt: STARTED, version: VERSION, season, news, saveError }),
         latestErrors: (state.errors ?? []).slice(0, 20),
+        // Source des données et quota Hyprace (plan Pro : 200 par jour, 4 000 par mois).
+        dataSource: {
+          source: season?.source ?? "aucune",
+          hyprace: hypraceClient ? { ...hypraceClient.usage } : null,
+        },
       },
     ];
   }

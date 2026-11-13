@@ -154,6 +154,12 @@ export const dnfCount = (rows) =>
 export function qualiReference(results) {
   const race = results.Race;
   if (!race?.length || !race.some((r) => r.grid > 0)) {
+    // Grille officielle publiée avant la course (Hyprace) : elle fait foi.
+    if (results.Grid?.length)
+      return {
+        rows: results.Grid.map((r, i) => ({ driverId: r.driverId, position: i + 1 })),
+        grid: true,
+      };
     // Avant la course : grille provisoire si des pénalités sont annoncées.
     const quali = results.Qualifying;
     if (quali?.length && results.penalties?.length) {

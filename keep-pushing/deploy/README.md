@@ -113,18 +113,25 @@ docker compose run --rm keep-pushing node scripts/add-bet.mjs <pseudo> 19 quali 
 docker compose start
 ```
 
-## Essais libres (fournisseur à choisir)
+## Données F1 : Hyprace
 
-Jolpica ne publie pas les essais libres ni la qualif sprint. Le serveur a un
-connecteur prêt (`src/practice.mjs`) : il suffit d'ajouter l'adaptateur du
-fournisseur retenu (Hyprace en premier choix, licence commerciale) dans
-`PROVIDERS`, puis dans `.env` :
+Calendrier, classements, résultats (essais libres compris) et grille de
+départ officielle viennent de l'API Hyprace (RapidAPI, plan Pro : 200 appels
+par jour, 4 000 par mois, bloqué au-delà). Seul le serveur l'appelle, et il
+garde tout en mémoire et sur disque (`data/hyprace.json`) : le nombre de
+joueurs ne change pas la consommation (environ 1 000 à 1 500 appels par mois).
+Il garde une réserve de 15 appels par jour et sert ce qu'il a en mémoire si
+elle est atteinte. Quota restant : Réglages → Tableau de bord admin.
+
+Activer (clé RapidAPI : page de l'API Hyprace → Endpoints → X-RapidAPI-Key) :
+```bash
+cd /opt/keep-pushing/keep-pushing
+nano .env   # ajouter la ligne HYPRACE_API_KEY=ta_cle (sans espace ni guillemets)
+docker compose up -d --build
 ```
-PRACTICE_PROVIDER=hyprace
-PRACTICE_API_KEY=…
-```
-et `docker compose up -d`. Sans fournisseur, l'appli affiche « Résultats des
-essais pas encore disponibles ». OpenF1 est exclu : usage non commercial.
+Sans clé, ou si Hyprace ne répond pas au démarrage, le serveur utilise
+Jolpica comme avant. Les historiques (vainqueurs d'un circuit, saison d'un
+pilote ou d'une écurie) restent fournis par Jolpica.
 
 ## Pubs pour regagner le joker (après la sortie sur les stores)
 

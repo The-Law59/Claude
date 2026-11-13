@@ -17,6 +17,15 @@ type Stats = {
   feedback: { count: number; average: number | null };
   errors: { total: number; last24h: number };
   health: { ok: boolean; version: string; uptime: number; checks: Record<string, string> };
+  dataSource?: {
+    source: string;
+    hyprace: {
+      calls: number;
+      remainingDay: number | null;
+      remainingMonth: number | null;
+      lastError: string;
+    } | null;
+  };
   latestErrors: {
     signature: string;
     source: string;
@@ -136,6 +145,16 @@ export default function Admin() {
         <Text style={s.small}>
           Saison : {h.checks.season} · actus : {h.checks.news} · sauvegarde : {h.checks.save}
         </Text>
+        {!!data.dataSource && (
+          <Text style={s.small}>
+            Données : {data.dataSource.source === "hyprace" ? "Hyprace" : "Jolpica"}
+            {data.dataSource.hyprace &&
+              ` · quota Hyprace : ${data.dataSource.hyprace.remainingDay ?? "?"} appels restants aujourd’hui (sur 200), ${data.dataSource.hyprace.remainingMonth ?? "?"} ce mois (sur 4 000) · ${data.dataSource.hyprace.calls} appel(s) depuis le démarrage`}
+            {data.dataSource.hyprace?.lastError
+              ? ` · dernière erreur : ${data.dataSource.hyprace.lastError}`
+              : ""}
+          </Text>
+        )}
       </View>
 
       <Text style={s.heading}>Joueurs</Text>

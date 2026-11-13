@@ -10,6 +10,8 @@ services:
       # IP de Nginx Proxy Manager (IP réelle des visiteurs, limites par IP).
       TRUST_PROXY: ${TRUST_PROXY:-}
       # Résultats des essais libres (fournisseur sous licence, voir deploy/README.md).
+      # Données F1 par Hyprace (RapidAPI, plan Pro) ; sans clé : Jolpica.
+      HYPRACE_API_KEY: ${HYPRACE_API_KEY:-}
       PRACTICE_PROVIDER: ${PRACTICE_PROVIDER:-}
       PRACTICE_API_KEY: ${PRACTICE_API_KEY:-}
       # Jeu Mercato : année de la grille à deviner (2028 par défaut).
