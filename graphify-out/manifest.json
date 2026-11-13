@@ -12,9 +12,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/app.json": {
-    "mtime": 1794493515.3036253,
-    "seen": 1794493741.0488415,
-    "ast_hash": "e776ccd808b95161bfe99cc9e393845c",
+    "mtime": 1794582578.684843,
+    "seen": 1794583011.475411,
+    "ast_hash": "514e89669902b33cd24ec3eea0a95568",
     "semantic_hash": ""
   },
   "keep-pushing/app/(tabs)/_layout.tsx": {
@@ -60,9 +60,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/app/(tabs)/settings.tsx": {
-    "mtime": 1794493515.3036253,
-    "seen": 1794493741.048852,
-    "ast_hash": "68f14c651ba5d1d283c36387733695e8",
+    "mtime": 1794582733.127945,
+    "seen": 1794583011.4754224,
+    "ast_hash": "6337da4154635885301affe8b8e793d6",
     "semantic_hash": ""
   },
   "keep-pushing/app/_layout.tsx": {
@@ -132,9 +132,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/app/login.tsx": {
-    "mtime": 1794493515.3036253,
-    "seen": 1794493741.0488646,
-    "ast_hash": "609f6893a2965258694b084e2dbb80e7",
+    "mtime": 1794582733.5768843,
+    "seen": 1794583011.4754367,
+    "ast_hash": "32f062c6e4934a8a5e1560d3ee6e5397",
     "semantic_hash": ""
   },
   "keep-pushing/app/notifications.tsx": {
@@ -174,9 +174,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/package.json": {
-    "mtime": 1794493515.3076253,
-    "seen": 1794493741.048876,
-    "ast_hash": "73e51060a35da6a2f318a9fdde77efd7",
+    "mtime": 1794582582.808751,
+    "seen": 1794583011.47545,
+    "ast_hash": "a0e488bea7cb4d5ea0eaaf15d518d8ca",
     "semantic_hash": ""
   },
   "keep-pushing/scripts/reset-password.mjs": {
@@ -186,9 +186,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/server.mjs": {
-    "mtime": 1794561149.871979,
-    "seen": 1794561332.0530353,
-    "ast_hash": "917c86bb0028eadf702488c6f9b49f53",
+    "mtime": 1794582716.5191636,
+    "seen": 1794583011.4754553,
+    "ast_hash": "c8515ffedd8dd11aeb73be6c66d86a0b",
     "semantic_hash": ""
   },
   "keep-pushing/src/RecapCard.tsx": {
@@ -198,15 +198,15 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/account.mjs": {
-    "mtime": 1794493515.3130531,
-    "seen": 1794493741.0488827,
-    "ast_hash": "f5d16e90a091f04eb792f03c66801106",
+    "mtime": 1794582641.7692227,
+    "seen": 1794583011.4754574,
+    "ast_hash": "697c87afca18adbf0b5fbd8bd308df07",
     "semantic_hash": ""
   },
   "keep-pushing/src/accounts.mjs": {
-    "mtime": 1794493515.3130531,
-    "seen": 1794493741.0488837,
-    "ast_hash": "79c3f6c5ce775f4db2fdc846e6e0f4cc",
+    "mtime": 1794582659.3528798,
+    "seen": 1794583011.4754589,
+    "ast_hash": "7dbfdcb14a9d73f4d42487e09ab68e5e",
     "semantic_hash": ""
   },
   "keep-pushing/src/admin.mjs": {
@@ -228,9 +228,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/api.mjs": {
-    "mtime": 1794493515.3130531,
-    "seen": 1794493741.0488882,
-    "ast_hash": "40c3176224c212b6b0ffd2b64d1d75d3",
+    "mtime": 1794582733.6728842,
+    "seen": 1794583011.4754636,
+    "ast_hash": "e2903efbf03fba9a0e7683b1136e378c",
     "semantic_hash": ""
   },
   "keep-pushing/src/bets.mjs": {
@@ -246,9 +246,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/community.mjs": {
-    "mtime": 1794493515.3130531,
-    "seen": 1794493741.0488913,
-    "ast_hash": "d6dee241dfb030341697b9c2d719f1d4",
+    "mtime": 1794582641.767624,
+    "seen": 1794583011.4754667,
+    "ast_hash": "32789db8f1a34c6f0b6dec7846146fee",
     "semantic_hash": ""
   },
   "keep-pushing/src/crash.ts": {
@@ -276,9 +276,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/src/leagues.mjs": {
-    "mtime": 1794493515.3130531,
-    "seen": 1794493741.0488975,
-    "ast_hash": "40305b69f2d7cdc1eee4a26e2b59bb15",
+    "mtime": 1794582641.7681406,
+    "seen": 1794583011.4754758,
+    "ast_hash": "c1cfdae0276e51bf31155f39f7bff229",
     "semantic_hash": ""
   },
   "keep-pushing/src/model.mjs": {
@@ -468,9 +468,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/README.md": {
-    "mtime": 1794561321.7166195,
-    "seen": 1794561332.0531151,
-    "ast_hash": "6129048ced7fbe6515a8420185176397",
+    "mtime": 1794582999.8508284,
+    "seen": 1794583011.4755406,
+    "ast_hash": "5c973736ac39040f47f8a5dc8e28aea7",
     "semantic_hash": ""
   },
   "keep-pushing/VALIDATION.md": {
@@ -486,9 +486,9 @@
     "semantic_hash": ""
   },
   "keep-pushing/docker-compose.yml": {
-    "mtime": 1794561321.7155275,
-    "seen": 1794561332.053028,
-    "ast_hash": "e6d8f5ce5dd5b50e660450a1326494f2",
+    "mtime": 1794582749.8025181,
+    "seen": 1794583011.475447,
+    "ast_hash": "8d75b68de86a5ad2fa410b14f3614344",
     "semantic_hash": ""
   },
   "keep-pushing/docs/pubs-joker.md": {
@@ -671,10 +671,106 @@
     "ast_hash": "c75ff1efd9ca3208557629fcaf9e0760",
     "semantic_hash": ""
   },
+  "keep-pushing/eas.json": {
+    "mtime": 1794582557.9512787,
+    "seen": 1794583011.4754486,
+    "ast_hash": "c917477b00f22b008b522c4351698ece",
+    "semantic_hash": ""
+  },
+  "keep-pushing/src/legal.mjs": {
+    "mtime": 1794582733.684884,
+    "seen": 1794583011.4754767,
+    "ast_hash": "5b69fe14b64de71eb02a77563f6a5e74",
+    "semantic_hash": ""
+  },
+  "keep-pushing/src/moderation.mjs": {
+    "mtime": 1794582659.1688797,
+    "seen": 1794583011.4754813,
+    "ast_hash": "81be825c505dbdfa9bfa1fe0cf82171b",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/legal.test.mjs": {
+    "mtime": 1794582750.160885,
+    "seen": 1794583011.4755208,
+    "ast_hash": "2310e5a6bf3fbf01f6a09435f64aca48",
+    "semantic_hash": ""
+  },
+  "keep-pushing/tests/moderation.test.mjs": {
+    "mtime": 1794582659.1848798,
+    "seen": 1794583011.4755247,
+    "ast_hash": "97c8df489061280fc065ccb4eeab31b4",
+    "semantic_hash": ""
+  },
+  "keep-pushing/store/APP-STORE.md": {
+    "mtime": 1794582983.4408991,
+    "seen": 1794583011.4755447,
+    "ast_hash": "8d0d75b99d5d3108e1bb52f042ff54e6",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/icon.png": {
+    "mtime": 1794582541.1288726,
+    "seen": 1794583011.4755485,
+    "ast_hash": "9b36ea0b4168c93027e4f3b2d4e22894",
+    "semantic_hash": ""
+  },
+  "keep-pushing/assets/splash-icon.png": {
+    "mtime": 1794582541.3288727,
+    "seen": 1794583011.4755495,
+    "ast_hash": "20afb845098bf9f94b2e0bcc47789e6b",
+    "semantic_hash": ""
+  },
+  "keep-pushing/store/icon-1024.png": {
+    "mtime": 1794582947.8019786,
+    "seen": 1794583011.4755507,
+    "ast_hash": "9b36ea0b4168c93027e4f3b2d4e22894",
+    "semantic_hash": ""
+  },
+  "keep-pushing/store/screenshots/1-accueil.jpg": {
+    "mtime": 1794582947.408897,
+    "seen": 1794583011.4755518,
+    "ast_hash": "025adb4bf7af0f9f6b977eaddc062ff7",
+    "semantic_hash": ""
+  },
+  "keep-pushing/store/screenshots/2-pronos.jpg": {
+    "mtime": 1794582947.4688969,
+    "seen": 1794583011.4755526,
+    "ast_hash": "be3ccf0bcb0b50d64a288df905904e10",
+    "semantic_hash": ""
+  },
+  "keep-pushing/store/screenshots/3-assistant.jpg": {
+    "mtime": 1794582947.5248969,
+    "seen": 1794583011.4755535,
+    "ast_hash": "53c058aa86999e02a0540112729b967d",
+    "semantic_hash": ""
+  },
+  "keep-pushing/store/screenshots/4-classements.jpg": {
+    "mtime": 1794582947.588897,
+    "seen": 1794583011.4755545,
+    "ast_hash": "f2b5dbb5f7d1f3207562dc382915d8d6",
+    "semantic_hash": ""
+  },
+  "keep-pushing/store/screenshots/5-grand-prix.jpg": {
+    "mtime": 1794582947.652897,
+    "seen": 1794583011.4755554,
+    "ast_hash": "dac45dd8e66d90ce09a3c2bb00a39a59",
+    "semantic_hash": ""
+  },
+  "keep-pushing/store/screenshots/6-forum.jpg": {
+    "mtime": 1794582947.7128968,
+    "seen": 1794583011.4755564,
+    "ast_hash": "03d2ffe85f1f4ebc5fa46e5eab147240",
+    "semantic_hash": ""
+  },
+  "keep-pushing/store/screenshots/7-mercato.jpg": {
+    "mtime": 1794582947.776897,
+    "seen": 1794583011.4755573,
+    "ast_hash": "120856b5891cc5cedaa00e38071815a9",
+    "semantic_hash": ""
+  },
   "keep-pushing/package-lock.json": {
-    "mtime": 1794493515.3076253,
-    "seen": 1794493741.0489702,
-    "ast_hash": "e927de019db2bf2ac8fb0213004e0b37",
+    "mtime": 1794582518.2368715,
+    "seen": 1794583011.4755583,
+    "ast_hash": "0de3d4647b0c3a0d22be52f721c05fae",
     "semantic_hash": ""
   }
 }

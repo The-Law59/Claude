@@ -64,6 +64,10 @@ Les rappels locaux sont réservés au téléphone.
 - Mon pilote et mon écurie (★) : l’app prend la couleur de l’écurie choisie (`src/teams.mjs`, contraste vérifié par les tests), carte « Mon paddock » sur l’accueil (classement, points, dernier résultat), mis en avant dans les classements. Autres favoris pour filtrer les actualités. Réglages enregistrés sur l’appareil, sans compte.
 - Rappels locaux neutres à 10, 30 ou 60 minutes pour les sessions du prochain Grand Prix.
 
+## Publication iOS
+
+Guide pas à pas (TestFlight puis App Store), textes de la fiche, réponses aux questionnaires et captures : `store/APP-STORE.md`. Build : `eas build --platform ios --profile production` (configuration `eas.json`, serveur `https://f1.thel4w.ovh` intégré). Pages légales servies par le serveur : `/confidentialite`, `/conditions`, `/assistance` (`src/legal.mjs`, variables `PUBLISHER_NAME` et `CONTACT_EMAIL`). Inscription soumise à l’acceptation des conditions ; filtre des propos injurieux sur le forum, les ligues et les pseudos (`src/moderation.mjs`).
+
 ## Architecture
 
 - `app/` : écrans (expo-router). `(tabs)/` contient les onglets Accueil, Pronos, Forum, Saison (Favoris et Réglages y sont cachés, ouverts par le menu ☰ de `src/ui.tsx`) ; `article/[id].tsx` le détail d’un article ; `gp/[id].tsx` un Grand Prix. Le bouton retour Android et les liens `raceiq://` fonctionnent.

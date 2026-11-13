@@ -12,6 +12,9 @@ services:
       # Résultats des essais libres (fournisseur sous licence, voir deploy/README.md).
       # Données F1 par Hyprace (RapidAPI, plan Pro) ; sans clé : Jolpica.
       HYPRACE_API_KEY: ${HYPRACE_API_KEY:-}
+      # Pages légales (App Store) : éditeur et adresse de contact affichés.
+      PUBLISHER_NAME: ${PUBLISHER_NAME:-}
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
       PRACTICE_PROVIDER: ${PRACTICE_PROVIDER:-}
       PRACTICE_API_KEY: ${PRACTICE_API_KEY:-}
       # Jeu Mercato : année de la grille à deviner (2028 par défaut).

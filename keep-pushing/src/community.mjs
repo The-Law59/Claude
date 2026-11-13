@@ -2,6 +2,7 @@
 // (state.feedback, state.forum) ; server.mjs gère HTTP et sauvegarde.
 // Admins (pseudos de la variable ADMINS) : lisent les avis, modèrent le forum.
 import { randomBytes } from "node:crypto";
+import { assertClean } from "./moderation.mjs";
 import { fail } from "./errors.mjs";
 import { CATEGORIES, FEATURES } from "./community.labels.mjs";
 
@@ -85,6 +86,8 @@ export function createTopic(
   if (!(category in CATEGORIES)) fail(400, "Catégorie inconnue.");
   const title = clean(body?.title, LIMITS.title, "Titre", 3);
   const text = clean(body?.text, LIMITS.text, "Message");
+  assertClean(title, "Titre");
+  assertClean(text);
   // Sujet de week-end : rattaché à un GP pour être masqué par l'anti-spoil.
   const eventId = category === "weekend" && eventIds.includes(body?.eventId) ? body.eventId : null;
   const mine = Object.values(forum(state).topics).filter((t) => t.posts[0]?.userId === user.id);
@@ -118,6 +121,7 @@ const topicOf = (state, topicId) => {
 export function reply(state, user, topicId, body, { now = Date.now(), rand = randomBytes } = {}) {
   const t = topicOf(state, topicId);
   const text = clean(body?.text, LIMITS.text, "Message");
+  assertClean(text);
   if (now - lastBy(state, user) < GAP.post)
     fail(429, "Doucement : un message toutes les 10 secondes.");
   if (t.posts.length >= LIMITS.posts) fail(409, "Sujet complet : ouvrez-en un nouveau.");

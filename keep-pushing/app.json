@@ -2,20 +2,42 @@
   "expo": {
     "name": "RaceIQ",
     "slug": "raceiq",
-    "version": "0.2.0",
+    "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
+    "backgroundColor": "#0b0e13",
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.raceiq.mobile"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.raceiq.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "com.raceiq.mobile"
+      "package": "com.raceiq.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/splash-icon.png",
+        "backgroundColor": "#0b0e13"
+      }
     },
     "plugins": [
       "expo-notifications",
       "expo-status-bar",
-      "expo-router"
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#0b0e13",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0b0e13"
+          }
+        }
+      ]
     ],
     "scheme": "raceiq"
   }

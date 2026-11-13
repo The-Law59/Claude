@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Text, TextInput, View } from "react-native";
+import { Linking, Pressable, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
-import { api } from "../src/api.mjs";
+import { api, publicUrl } from "../src/api.mjs";
 import { useStore } from "../src/store";
 import { Button, Pills, Screen, useTheme } from "../src/ui";
 
@@ -16,6 +16,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [accepted, setAccepted] = useState(false);
   const leave = () => router.replace("/pronos");
 
   const submit = async () => {
@@ -24,7 +25,7 @@ export default function Login() {
     try {
       const { token, user } = await api(mode === "login" ? "/api/login" : "/api/register", {
         method: "POST",
-        body: { pseudo, password },
+        body: { pseudo, password, ...(mode === "register" && { acceptTerms: accepted }) },
       });
       update({ account: { token, id: user.id, pseudo: user.pseudo }, welcomed: true });
       leave();
@@ -84,15 +85,48 @@ export default function Login() {
           onSubmitEditing={submit}
         />
         {mode === "register" && (
-          <Text style={s.small}>
-            Pas d’e-mail demandé. Mot de passe oublié : demandez à l’administrateur du serveur de le
-            réinitialiser.
-          </Text>
+          <>
+            <Text style={s.small}>
+              Pas d’e-mail demandé. Mot de passe oublié : demandez à l’administrateur du serveur de
+              le réinitialiser.
+            </Text>
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: accepted }}
+              onPress={() => setAccepted(!accepted)}
+              style={{ flexDirection: "row", gap: 10, alignItems: "flex-start", minHeight: 44 }}
+            >
+              <Text style={{ fontSize: 22, color: accepted ? c.accent : c.muted }}>
+                {accepted ? "☑" : "☐"}
+              </Text>
+              <Text style={[s.small, { flex: 1 }]}>
+                J’accepte les{" "}
+                <Text
+                  style={{ color: c.accent }}
+                  onPress={() => Linking.openURL(publicUrl("/conditions"))}
+                >
+                  conditions d’utilisation
+                </Text>{" "}
+                (tolérance zéro pour les propos injurieux ou haineux) et la{" "}
+                <Text
+                  style={{ color: c.accent }}
+                  onPress={() => Linking.openURL(publicUrl("/confidentialite"))}
+                >
+                  politique de confidentialité
+                </Text>
+                .
+              </Text>
+            </Pressable>
+          </>
         )}
         {!!error && <Text style={s.error}>{error}</Text>}
         <Button
           label={busy ? "…" : mode === "login" ? "Se connecter" : "Créer mon compte"}
-          onPress={submit}
+          onPress={() =>
+            mode === "register" && !accepted
+              ? setError("Cochez la case pour accepter les conditions d’utilisation.")
+              : submit()
+          }
         />
       </View>
       <Button

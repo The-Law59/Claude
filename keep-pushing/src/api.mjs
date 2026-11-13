@@ -20,7 +20,12 @@ export async function api(path, { method = "GET", body, token } = {}) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok)
-    throw Object.assign(new Error(data.error ?? `Serveur indisponible (${res.status}).`), { status: res.status });
+    throw Object.assign(new Error(data.error ?? `Serveur indisponible (${res.status}).`), {
+      status: res.status,
+    });
   return data;
 }
 
+// Pages publiques du serveur (confidentialité, conditions, assistance).
+export const publicUrl = (path) =>
+  `${API_URL || (typeof location !== "undefined" ? location.origin : "")}${path}`;

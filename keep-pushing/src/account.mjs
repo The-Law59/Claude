@@ -4,6 +4,7 @@
 import { randomBytes } from "node:crypto";
 import { PSEUDO_RULE, checkPassword, hashPassword, sessionHash } from "./accounts.mjs";
 import { fail } from "./errors.mjs";
+import { assertClean } from "./moderation.mjs";
 import { forget as forgetMercato } from "./mercato.mjs";
 
 const bearer = (header) => (header ?? "").replace(/^Bearer /, "");
@@ -29,6 +30,7 @@ export async function changePseudo(state, user, body) {
   const pseudo = typeof body?.pseudo === "string" ? body.pseudo.trim() : "";
   if (!PSEUDO_RULE.test(pseudo))
     fail(400, "Pseudo : 3 à 20 lettres, chiffres, « _ », « - » ou « . ».");
+  assertClean(pseudo, "Pseudo");
   const taken = Object.values(state.users).some(
     (u) => u.id !== user.id && u.pseudo.toLowerCase() === pseudo.toLowerCase(),
   );

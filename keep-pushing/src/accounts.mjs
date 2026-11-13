@@ -2,6 +2,7 @@
 // état JSON { users, sessions } ; server.mjs gère HTTP et sauvegarde.
 // Mots de passe dérivés avec scrypt + sel, jetons de session stockés hachés.
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { assertClean } from "./moderation.mjs";
 import { promisify } from "node:util";
 import { GameError, fail } from "./errors.mjs";
 
@@ -47,6 +48,7 @@ function openSession(state, user, rand) {
 export async function register(state, body, rand = randomBytes) {
   const { pseudo, password } = credentials(body);
   if (!PSEUDO.test(pseudo)) fail(400, "Pseudo : 3 à 20 lettres, chiffres, « _ », « - » ou « . ».");
+  assertClean(pseudo, "Pseudo");
   if (password.length < 8 || password.length > 100)
     fail(400, "Mot de passe : au moins 8 caractères.");
   if (Object.keys(state.users).length >= LIMITS.users)
@@ -69,7 +71,11 @@ export async function register(state, body, rand = randomBytes) {
 // failures : Map en mémoire (pseudo -> { count, until }) contre les essais en rafale.
 // ip : le blocage vise le couple pseudo + IP, pour qu'un inconnu ne puisse pas
 // bloquer le compte d'un autre joueur en ratant exprès son mot de passe.
-export async function login(state, body, { failures, ip = "", now = Date.now(), rand = randomBytes }) {
+export async function login(
+  state,
+  body,
+  { failures, ip = "", now = Date.now(), rand = randomBytes },
+) {
   const { pseudo, password } = credentials(body);
   const key = `${keyOf(pseudo)}|${ip}`; // clé du blocage
   const f = failures.get(key);

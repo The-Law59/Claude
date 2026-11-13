@@ -1,6 +1,7 @@
 // Ligues privées : un nom, un code d'invitation, un classement à part.
 // État : state.leagues = { id: { id, name, code, owner, members: [userId] } }.
 import { randomBytes } from "node:crypto";
+import { assertClean } from "./moderation.mjs";
 import { fail } from "./errors.mjs";
 
 const LIMITS = { name: 40, members: 100, perUser: 10, total: 2000 };
@@ -13,6 +14,7 @@ export function createLeague(state, user, body, rand = randomBytes) {
   const name = typeof body?.name === "string" ? body.name.trim().replace(/\s+/g, " ") : "";
   if (!name || name.length > LIMITS.name)
     fail(400, `Nom de la ligue : 1 à ${LIMITS.name} caractères.`);
+  assertClean(name, "Nom de ligue");
   state.leagues ??= {};
   if (mine(state, user).length >= LIMITS.perUser) fail(409, `${LIMITS.perUser} ligues au maximum.`);
   if (Object.keys(state.leagues).length >= LIMITS.total)
@@ -66,6 +68,7 @@ export function postMessage(state, user, id, body, { now = Date.now(), rand = ra
   const league = member(state, user, id);
   const text = typeof body?.text === "string" ? body.text.trim().replace(/\s+/g, " ") : "";
   if (!text || text.length > CHAT.length) fail(400, `Message : 1 à ${CHAT.length} caractères.`);
+  assertClean(text);
   league.messages ??= [];
   const last = league.messages.findLast((m) => m.userId === user.id);
   if (last && now - last.at < CHAT.gapMs)

@@ -11,6 +11,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { fetchFeeds, toArticle } from "./src/news.mjs";
 import { loadRound, loadSeason, markInactive } from "./src/jolpica.mjs";
 import * as hyprace from "./src/hyprace.mjs";
+import { legalPage } from "./src/legal.mjs";
 import { createTranslator } from "./src/translate.mjs";
 import * as accounts from "./src/accounts.mjs";
 import * as account from "./src/account.mjs";
@@ -917,7 +918,12 @@ async function api(req, path) {
     const body = await readJson(req);
     if (securite.adminPseudoTaken(ADMINS, body?.pseudo))
       return [409, { error: "Ce pseudo est déjà pris." }];
-    return [201, await changed(await accounts.register(state, body))];
+    // Conditions d'utilisation acceptées (exigé par l'App Store : contenu des joueurs).
+    if (body?.acceptTerms !== true)
+      return [400, { error: "Acceptez les conditions d’utilisation pour créer un compte." }];
+    const created = await accounts.register(state, body);
+    state.users[created.user.id].termsAt = Date.now();
+    return [201, await changed(created)];
   }
   if (path === "/api/login" && req.method === "POST") {
     const ip = securite.clientIp(req, TRUSTED);
@@ -1184,6 +1190,15 @@ createServer(async (req, res) => {
         "access-control-allow-methods": "GET, POST, PUT, DELETE",
       });
       return res.end(status === 204 ? "" : JSON.stringify(body));
+    }
+    // Pages publiques exigées par l'App Store.
+    const legal = legalPage(path.slice(1), {
+      publisher: process.env.PUBLISHER_NAME,
+      contact: process.env.CONTACT_EMAIL,
+    });
+    if (legal) {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      return res.end(legal);
     }
     // normalize + préfixe : empêche de sortir de dist/ avec « .. ».
     const file = normalize(join(DIST, path));

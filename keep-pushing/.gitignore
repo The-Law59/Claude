@@ -5,3 +5,5 @@ dist/
 graphify-out/
 .env
 data/
+ios/
+android/

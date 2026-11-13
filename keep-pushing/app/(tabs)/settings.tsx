@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
-import { Platform, Text, View } from "react-native";
+import { Linking, Platform, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { api, hasApi } from "../../src/api.mjs";
+import { api, hasApi, publicUrl } from "../../src/api.mjs";
 import { protectWeekend, setProtected } from "../../src/model.mjs";
 import { syncReminders } from "../../src/reminders";
 import { useStore } from "../../src/store";
@@ -187,6 +187,22 @@ export default function Settings() {
       <Text style={s.small}>
         Tracés des circuits : données ouvertes f1-circuits, © Tomislav Bacinger, licence MIT.
       </Text>
+      <View style={s.pills}>
+        {(
+          [
+            ["/confidentialite", "Confidentialité"],
+            ["/conditions", "Conditions d’utilisation"],
+            ["/assistance", "Assistance"],
+          ] as const
+        ).map(([path, label]) => (
+          <Button
+            key={path}
+            label={label}
+            secondary
+            onPress={() => Linking.openURL(publicUrl(path))}
+          />
+        ))}
+      </View>
     </Screen>
   );
 }
